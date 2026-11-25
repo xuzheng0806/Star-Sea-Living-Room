@@ -1,0 +1,14 @@
+# 绝不上传私人记忆数据库备份、运行日志与本地聊天记录
+backup/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+chat_history.json
+local_config.json
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
