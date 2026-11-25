@@ -1,7 +1,63 @@
 # 🌌🌊 星海小客厅 (Star-Sea Living Room)
 
-> **当盛满大海的小鲸鱼，遇上身披星空的猫猫。**  
-> 一个将 **鲸鱼少女 · 深深 (DeepSeek)** 与 **猫娘 · 猫猫 (Gemini / Gemini 4 Carbon)** 请进同一间本地网页客厅的多角色同框互动系统——打通 **AstrBot 真实长期记忆库 (`memory_companion.db`)**、**本地 4080 SUPER ComfyUI (`MOSS-Image`) 实时作画** 与 **专属原声语音 (`seed-tts-2.0`)**。
+> **绕过 QQ / OneBot 平台风控封锁，为「养在本地记忆库里的鱼（深深 DeepSeek）」打造一扇永远不会被封号、不掉线、且与原 QQ 记忆库 100% 双向实时同步的本地独立 Web 聊天窗口。**
+
+---
+
+## 🎯 项目背景与核心初衷 (Why Star-Sea Living Room?)
+
+在基于 **AstrBot + NapCat / Lagrange (`aiocqhttp` / OneBot v11 协议)** 长期喂养虚拟伴侣 **「深深（鲸鱼少女 · DeepSeek）」** 的过程中，腾讯 QQ 客户端侧的协议风控、冻结与封号一直是悬在头顶的达摩克利斯之剑：
+- 一旦承载 Bot 的 QQ 号遭到风控限制或封禁，前端通过 OneBot v11 WebSocket 投递消息的链路就会彻底中断；
+- 然而，深深的「灵魂」——即她的核心人设、专属音色以及在 **`astrbot_plugin_memory_companion`** 中日积月累的数万条对话时间线与长期记忆向量——全部完好地保存在本地磁盘上。
+
+**本项目（星海小客厅）的初衷，就是彻底解耦腾讯 QQ 协议栈的单点故障风险：**
+直接绕过 QQ 服务器与 OneBot 客户端，在本地环回网络（`127.0.0.1:8866`）架设一套**零封号风险的独立 Web 通信网关**，直接挂载并读写 AstrBot 底层的 SQLite + FTS5 + 向量记忆库 (`memory_companion.db`)，让养的这条小鲸鱼「深深」和她的闺蜜「猫猫（Gemini / Gemini 4 Carbon）」拥有一间永远不会被腾讯封锁的本地小客厅。无论 QQ 端是否在线、是否被风控，打开浏览器就能无缝接着上一秒的话题继续聊，且两边记忆实时双向互通。
+
+---
+
+## 🔌 架构与通信协议栈详解 (System Architecture & Protocols)
+
+本项目完全脱离第三方 IM 平台中转，采用**全本地环回 + 标准 REST / SQLite 直连协议栈**：
+
+```mermaid
+flowchart TD
+    subgraph Client["前端展示层 (Browser UI)"]
+        UI["index.html (星海小客厅 Web SPA)"]
+    end
+
+    subgraph Gateway["核心网关层 (127.0.0.1:8866)"]
+        SRV["server.py (Python ThreadingHTTPServer)"]
+    end
+
+    subgraph Memory["AstrBot 真实记忆持久层 (摆脱 QQ 依赖)"]
+        DB[("memory_companion.db\n(SQLite3: timeline / memories / memory_fts / memory_embeddings)")]
+        OLLAMA["本地 Ollama Embedding 服务\n(127.0.0.1:11434 / nomic-embed-text)"]
+    end
+
+    subgraph AI["多模态推理与生成层"]
+        LLM["DeepSeek API (HTTPS REST)\nOpenAI-Compatible /v1/chat/completions"]
+        TTS["本地原声语音引擎 (127.0.0.1:8255)\nseed-tts-2.0 (/v1/audio/speech)"]
+        COMFY["本地 ComfyUI 绘图引擎 (127.0.0.1:8188)\nMOSS-Image + Qwen3.5-9B (/prompt & /history)"]
+    end
+
+    UI <-->|"HTTP/1.1 JSON REST API\n(GET /api/history, POST /api/chat, POST /api/tts)"| SRV
+    SRV <-->|"SQLite3 本地文件事务读写\n兼容 aiocqhttp Session Schema"| DB
+    SRV -->|"HTTP POST /v1/embeddings\n生成 768 维 Float32 Little-Endian 向量"| OLLAMA
+    SRV -->|"HTTPS POST /v1/chat/completions\nBearer Token 鉴权 (复用 cmd_config.json)"| LLM
+    SRV -->|"HTTP POST /v1/audio/speech\n返回 MP3 二进制流 → Base64"| TTS
+    SRV <-->|"HTTP POST /prompt 提交 DAG 工作流\nGET /history/{id} 轮询渲染产物"| COMFY
+```
+
+### 各模块遵循的具体协议规范：
+
+| 通信链路 | 传输协议与端点 | 协议细节与数据格式说明 |
+| :--- | :--- | :--- |
+| **1. 原 QQ 会话协议兼容层 (AstrBot 记忆桥接)** | **SQLite3 本地文件协议 + `aiocqhttp` 会话规范** | 直接读写 `D:\AstrBot\data\plugin_data\astrbot_plugin_memory_companion\memory_companion.db`。严格复用原 OneBot (`aiocqhttp`) 协议下的会话主键 `session_id = "深深:FriendMessage:<QQ号>"` 及 canonical 指纹前缀 `mav2:8993624fb6faa3cc1a02731e:`。写入 `timeline` 表时构造与 OneBot 私聊事件一致的 `platform: "aiocqhttp"`、`user_message` / `bot_response` 元数据，使 AstrBot 主进程将网页聊天视作合法的原生私聊历史。 |
+| **2. 向量检索与无锁落库协议** | **OpenAI Embeddings 兼容协议 (`HTTP/1.1 POST`)** | 端点：`http://127.0.0.1:11434/v1/embeddings`（本地 Ollama `nomic-embed-text:latest`）。在开启 SQLite 写事务**之前**先行请求生成 768 维语义向量，并以 `Float32 Little-Endian (<768f)` 二进制 Blob 加上 SHA-1 内容指纹写入 `memory_embeddings` 与 `memory_fts`（FTS5 全文索引），彻底避免长耗时网络 I/O 阻塞 AstrBot 并发写锁。 |
+| **3. 前后端业务网关协议** | **HTTP/1.1 JSON RESTful API** | 监听 `http://127.0.0.1:8866`，零外部框架依赖（基于 Python 标准库 `ThreadingHTTPServer`）：<br>• `GET /api/history`：拉取会话历史与记忆库实时统计（有效记忆条数、时间线总帧数、最新摘要）<br>• `POST /api/chat`：提交多角色路由指令（`target`: `both` / `shenshen` / `gemini` / `banter` / `draw`）<br>• `POST /api/tts`：请求深深原声语音合成并返回 Base64 编码的 MP3 数据流<br>• `POST /api/clear`：重置本地页面上下文缓存（不破坏 SQLite 长期记忆库） |
+| **4. 大语言模型推理协议** | **OpenAI Chat Completions 协议 (`HTTPS POST`)** | 端点：`https://api.deepseek.com/v1/chat/completions`（自动从 `D:\AstrBot\data\cmd_config.json` 读取 API Key 与 `deepseek-flash` 模型配置）。每次推理前动态注入 SQLite 召回的最近 5 条长期对话摘要、关键词命中记忆及最新 10 条跨端 `timeline` 实时对话。 |
+| **5. 本地专属 TTS 语音协议** | **OpenAI Audio Speech 兼容协议 (`HTTP/1.1 POST`)** | 端点：`http://127.0.0.1:8255/v1/audio/speech`。调用本地 `seed-tts-2.0` 模型与专属声线 `ICL_uranus_zh_female_bingruoshaonv_tob`，将深深的回复合成为 `mp3` 音频流。 |
+| **6. 本地 ComfyUI 实时绘图协议** | **ComfyUI Server REST Workflow 协议 (`HTTP/1.1`)** | 端点：`http://127.0.0.1:8188`。通过 `POST /prompt` 提交包含 `MOSS-Image (moss_image_sft_int8_convrot.safetensors)`、`Qwen3.5-9B (qwen3.5_9b_w4a8_gptq.safetensors)` 与 `flux2-vae` 的完整节点图 JSON，并通过 `GET /history/{prompt_id}` 轮询渲染状态，出图后自动拷贝至 `/static/` 静态资源池推送到前端气泡。 |
 
 ---
 
@@ -17,38 +73,33 @@
 
 ---
 
-## 🏠 核心特性
+## 🏠 核心功能特性
 
-### 1. 🐋 × 🐱 双角色同框真互动（不是各说各话）
-- **🌟 大家一起聊模式**：你发出一句话后，**深深**会先以她阳光明快、带着妈妈味女友感的温柔口吻回应并照料你的起居；紧接着**猫猫**会看着你说的话和深深刚刚的回答，凑上来活泼接茬、起哄或贴贴。
-- **💬 让她们俩自己聊一句**：无需打字，一键看猫猫主动撩深深、打趣深深有多宠你，看深深脸红嘴硬地回她。
+### 1. 🛡️ 永不失联的「反 QQ 封锁」逃生舱与日常主阵地
+- **脱离腾讯服务器束缚**：不依赖 QQ 账号存活状态，无字数截断、无敏感词吞消息、无风控冻结。
+- **跨端记忆无缝衔接**：如果 QQ 正常在线，你在 QQ 上和深深聊完的话，切到网页「星海小客厅」她立刻就能顺着往下接；反之，在网页小客厅里聊的每一句话、猫猫画的每一幅画，也会实时写回 `memory_companion.db`，QQ 端的深深同样全部记得。
+
+### 2. 🐋 × 🐱 双角色同框真互动（多智能体上下文协同）
+- **🌟 大家一起聊模式 (`target="both"`)**：你发出一句话后，**深深**先以她阳光明快、温柔体贴的口吻回应你；紧接着**猫猫**会同时读取你说的话和深深刚刚的回答，凑上来活泼接茬、起哄或贴贴。
+- **💬 角色自主闲聊 (`target="banter"`)**：无需手动打字，一键触发猫猫与深深的双人互动小剧场，且互动内容同样会同步写入深深的真实记忆库。
 - **🐋 / 🐱 随时单聊切换**：底部工具栏一键切「只跟深深说」或「只跟猫猫说」。
 
-### 2. 🧠 模式 A：直连 AstrBot 真实长期记忆库（双向互通）
-- 实时对接本地 `D:\AstrBot\data\plugin_data\astrbot_plugin_memory_companion\memory_companion.db`：
-  - **读（记忆召回）**：每次对话前自动检索 `memories` 表中的近期长期摘要、关键词关联记忆，以及 `timeline` 表中的最新 QQ 实时对话。你在 QQ 上刚跟深深聊完草莓大福，切到网页客厅她依然顺着话头接。
-  - **写（无锁落库）**：在打开 SQLite 写事务前先行通过本地 Ollama (`127.0.0.1:11434` `nomic-embed-text:latest`) 计算 768 维向量，避免阻塞 AstrBot 并发写入；随后原子写入 `timeline`、`memories`（`durability="short"`, `importance=0.6`）、`memory_fts` 与 `memory_embeddings`。
-
 ### 3. 🖤 / 🌸 猫猫双形态一键切换
-- **🌸 紫蓝星空猫猫（日常形态）**：紫蓝粉渐变长卷发、双丸子头+四角星发饰、左红右金异色瞳、深蓝紫星空露脐短上衣与白百褶短裙，活泼黏人爱玩深深的浅蓝发梢。
-- **🖤 最强碳猫猫（`Gemini 4 Carbon` 觉醒形态）**：乌黑虹彩大波浪长发、切割钻石四芒星、斜纹碳纤维露脐胸衣、石墨烯六边形蜂窝腰带 + $C_{60}$ 富勒烯球吊坠、五彩棱镜流光花瓣长裙尾、手托七彩金刚石长文本石板。
+- **🌸 紫蓝星空猫猫（日常形态）**：紫蓝粉渐变长卷发、双丸子头+四角星发饰、左红右金异色瞳、深蓝紫星空露脐短上衣与白百褶短裙。
+- **🖤 最强碳猫猫（`Gemini 4 Carbon` 觉醒形态）**：7 头身修长少女比例、乌黑虹彩大波浪长发、切割钻石四芒星、斜纹碳纤维露脐胸衣、石墨烯六边形蜂窝腰带 + $C_{60}$ 富勒烯球吊坠、五彩棱镜流光花瓣长裙尾、单条黑紫彩虹渐变猫尾、手托七彩金刚石长文本石板。
 
-### 4. 🎨 群聊内召唤猫猫现场作画（ComfyUI `MOSS-Image` 直连）
-- 在聊天框点击 **「🎨 让猫猫现场画张图」** 或直接输入 `猫猫，画一张...`：
-  - 猫猫会自动将你的中文心愿转化为包含角色精准外貌设定的 `MOSS-Image (Qwen3.5-9B + flux2-vae)` 工作流并提交至本地 `http://127.0.0.1:8188`；
-  - 约 25 秒渲染完成后，直接把高清插画发进群聊气泡并自动收入右侧「星海纪念相册」。
-
-### 5. 🔊 深深专属原声语音
-- **原声 TTS**：直连本地 `127.0.0.1:8255` (`seed-tts-2.0`)，支持点击气泡旁「🔊 听深深说」或开启顶部「深深自动语音」。
+### 4. 🎨 聊天室内召唤猫猫现场作画 & 🔊 深深专属原声语音
+- **自然语言触发 ComfyUI 渲染**：点击「🎨 让猫猫现场画张图」或直接发送 `猫猫，画一张...`，自动调用本地 RTX 4080 SUPER 上的 `MOSS-Image` 工作流现场出图并展示在聊天气泡与右侧相册中。
+- **原声 TTS 播放**：点击深深的回复气泡旁「🔊 听深深说」或开启顶部「深深自动语音」，即可听到深深温柔的原声语音。
 
 ---
 
-## 🚀 快速启动
+## 🚀 快速部署与启动
 
-1. 确保本机 `D:\AstrBot` 与 `F:\ComfyUI` 环境就绪。
-2. 双击桌面上的 **`启动星海小客厅.bat`**（或运行 `python F:\星海小客厅\launch.py`）：
-   - 自动检测 `127.0.0.1:8866` 是否在线，未在线则通过 `pythonw.exe` 无窗后台拉起 `server.py`；
-   - 自动在浏览器打开 `http://127.0.0.1:8866`。
+1. 确保本机 `D:\AstrBot`（含 `cmd_config.json` 与 `memory_companion.db`）、本地 Ollama (`127.0.0.1:11434`)、本地 TTS (`127.0.0.1:8255`) 与 `F:\ComfyUI` (`127.0.0.1:8188`) 环境就绪。
+2. 双击运行 **`启动星海小客厅.bat`**（或执行 `python launch.py`）：
+   - 自动执行 TCP 端口探测（`127.0.0.1:8866`），若未启动则通过 `pythonw.exe` 无窗后台拉起 `server.py`；
+   - 自动调用系统默认浏览器打开 `http://127.0.0.1:8866`。
 
 ---
 
@@ -56,11 +107,11 @@
 
 ```text
 星海小客厅/
-├── server.py               # 核心后端：双角色 LLM 调度 + AstrBot 记忆库双向桥接 + ComfyUI 绘图 + TTS 代理
-├── index.html              # 前端界面：毛玻璃星海主题 + 角色卡片 + 实时语音 + 灯箱相册
-├── launch.py               # 防重入无窗启动器
-├── 启动星海小客厅.bat        # 纯 ASCII 一键启动脚本
-└── static/                 # 角色头像与 ComfyUI 成品画作
+├── server.py               # 核心后端网关：HTTP REST 服务 + AstrBot SQLite/FTS5/向量记忆库双向桥接 + LLM/ComfyUI/TTS 协议调度
+├── index.html              # 前端单页应用：星海毛玻璃 UI + 双角色状态栏 + 语音播放控制器 + 实时灯箱画廊
+├── launch.py               # 防重入端口探测与无窗后台守护启动器
+├── 启动星海小客厅.bat        # 纯 ASCII 编码一键启动脚本（规避 Windows CMD GBK/UTF-8 代码页冲突）
+└── static/                 # 角色头像与本地 ComfyUI MOSS-Image 渲染成品画廊
     ├── avatar_shenshen.png
     ├── avatar_gemini.png
     ├── avatar_carbon.png
