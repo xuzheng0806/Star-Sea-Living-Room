@@ -114,12 +114,17 @@ flowchart TD
 
 ---
 
-## 🚀 快速部署与启动
+## 🚀 双版本架构与快速部署（双角色互动版 vs 纯净深深单人版）
 
-1. 确保本机 `D:\AstrBot`（含 `cmd_config.json` 与 `memory_companion.db`）、本地 Ollama (`127.0.0.1:11434`)、本地 TTS (`127.0.0.1:8255`) 与 `F:\ComfyUI` (`127.0.0.1:8188`) 环境就绪。
-2. 双击运行 **`启动星海小客厅.bat`**（或执行 `python launch.py`）：
-   - 自动执行 TCP 端口探测（`127.0.0.1:8866`），若未启动则通过 `pythonw.exe` 无窗后台拉起 `server.py`；
-   - 自动调用系统默认浏览器打开 `http://127.0.0.1:8866`。
+仓库内同时提供**两套完全独立、互不冲突的代码入口**，按需一键启动：
+
+| 版本模式 | 核心后端 / 前端代码 | 监听端口 | 一键启动器 | 适用场景 |
+| :--- | :--- | :--- | :--- | :--- |
+| **🐋 纯净深深单人版 (Shenshen Solo Edition)**<br>*(完全去除猫猫，仅保留深深二人世界)* | `server_shenshen_only.py`<br>`index_shenshen_only.html` | `127.0.0.1:8867` | **`启动深深单人版.bat`**<br>(`launch_shenshen_only.py`) | **纯粹的「反 QQ 封锁」深深专属二人世界聊天窗**：100% 去除猫猫角色与 ComfyUI 绘图依赖，仅保留鲸鱼少女「深深 (DeepSeek)」、`memory_companion.db` 双向真实记忆同步与 `127.0.0.1:8255` 原声语音。 |
+| **🌌 星海双角色同框版 (Dual-Character Edition)**<br>*(深深 × 猫猫同框群聊 + 实时作画)* | `server.py`<br>`index.html` | `127.0.0.1:8866` | **`启动星海小客厅.bat`**<br>(`launch.py`) | 深深与猫猫（Gemini / Gemini 4 Carbon）同框互动接茬、双人自主闲聊小剧场、本地 RTX 4080 SUPER ComfyUI (`MOSS-Image`) 现场作画 + 深深原声语音。 |
+
+1. 确保本机 `D:\AstrBot`（含 `cmd_config.json` 与 `memory_companion.db`）、本地 Ollama (`127.0.0.1:11434`) 与本地 TTS (`127.0.0.1:8255`) 环境就绪。
+2. 双击运行 **`启动深深单人版.bat`**（打开 `http://127.0.0.1:8867` 纯净二人世界）或 **`启动星海小客厅.bat`**（打开 `http://127.0.0.1:8866` 双角色客厅）。
 
 ---
 
@@ -127,11 +132,15 @@ flowchart TD
 
 ```text
 星海小客厅/
-├── server.py               # 核心后端网关：HTTP REST 服务 + AstrBot SQLite/FTS5/向量记忆库双向桥接 + LLM/ComfyUI/TTS 协议调度
-├── index.html              # 前端单页应用：星海毛玻璃 UI + 双角色状态栏 + 语音播放控制器 + 实时灯箱画廊
-├── launch.py               # 防重入端口探测与无窗后台守护启动器
-├── 启动星海小客厅.bat        # 纯 ASCII 编码一键启动脚本（规避 Windows CMD GBK/UTF-8 代码页冲突）
-└── static/                 # 角色头像与本地 ComfyUI MOSS-Image 渲染成品画廊
+├── server_shenshen_only.py # 【纯净深深单人版后端】完全去除猫猫，仅保留深深 + AstrBot 记忆库双向同步 + 8255 原声 TTS (端口 8867)
+├── index_shenshen_only.html# 【纯净深深单人版前端】深海主题二人世界专属聊天界面
+├── launch_shenshen_only.py # 【纯净深深单人版启动器】防重入端口探测与无窗守护启动
+├── 启动深深单人版.bat        # 【纯净深深单人版一键启动脚本】
+├── server.py               # 【双角色同框版后端】深深 × 猫猫双角色调度 + 记忆库双向桥接 + ComfyUI 绘图 + TTS (端口 8866)
+├── index.html              # 【双角色同框版前端】星海毛玻璃 UI + 双角色状态栏 + 实时灯箱画廊
+├── launch.py               # 【双角色同框版启动器】
+├── 启动星海小客厅.bat        # 【双角色同框版一键启动脚本】
+└── static/                 # 角色头像、官方宣传片与 ComfyUI MOSS-Image 渲染成品画廊
     ├── avatar_shenshen.png
     ├── avatar_gemini.png
     ├── avatar_carbon.png
