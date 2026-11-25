@@ -74,6 +74,13 @@ flowchart TD
 
 ---
 
+## 🎬 官方宣传片 (1080p · 深深原声 TTS 配音导览 + 星海八音盒 BGM)
+
+- 📺 **[点此下载 / 观看《星海小客厅》1080p 官方宣传片 (`static/promo.mp4`, 76 秒)](static/promo.mp4)**
+  *(全片由本地 `127.0.0.1:8255` `seed-tts-2.0` 生成深深原声旁白解说，详解「反 QQ 风控封锁逃生舱」、「硬盘级直连 `memory_companion.db` 协议栈」、「最强碳猫猫 Gemini 4 Carbon 双角色互动」与「本地 ComfyUI MOSS-Image 实时渲染」)*
+
+---
+
 ## ✨ 成品画廊预览 (Generated with Local ComfyUI `MOSS-Image + Qwen3.5-9B`)
 
 | 《午后阳光下的猫猫与深深》 | 《海滨露台下午茶 · 深深 × 千问 × 猫猫》 |
@@ -132,5 +139,6 @@ flowchart TD
     ├── seaside_tea.png
     ├── carbon_v3.png
     ├── xianxia_carbon.png
-    └── gemini_moss.png
+    ├── gemini_moss.png
+    └── promo.mp4               # 1080p 官方宣传片 (含深深原声 TTS 配音 + 星海八音盒 BGM)
 ```
