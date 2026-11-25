@@ -2,119 +2,161 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>星海小客厅 · 阿正 × 深深 (支持单人纯净 / 双人同框一键切换)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d1527" />
+  <link rel="icon" href="/static/avatar_shenshen.png" />
+  <link rel="apple-touch-icon" href="/static/avatar_shenshen.png" />
+  <title>星海小客厅 v2.0 · 阿正 × 深深 × 猫猫</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       background: radial-gradient(circle at 15% 15%, #162447 0%, #0d1527 48%, #151026 100%);
       color: #f1f5f9;
+      height: 100dvh;
     }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 9999px; }
     .glass {
-      background: rgba(17, 25, 45, 0.72);
+      background: rgba(17, 25, 45, 0.76);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(148, 163, 184, 0.16);
     }
     .bubble-shen {
-      background: linear-gradient(135deg, rgba(14, 116, 144, 0.35), rgba(30, 58, 138, 0.42));
-      border: 1px solid rgba(56, 189, 248, 0.32);
+      background: linear-gradient(135deg, rgba(14, 116, 144, 0.38), rgba(30, 58, 138, 0.45));
+      border: 1px solid rgba(56, 189, 248, 0.35);
     }
     .bubble-cat-starry {
-      background: linear-gradient(135deg, rgba(126, 34, 206, 0.35), rgba(190, 24, 93, 0.32));
-      border: 1px solid rgba(216, 180, 254, 0.35);
+      background: linear-gradient(135deg, rgba(126, 34, 206, 0.38), rgba(190, 24, 93, 0.34));
+      border: 1px solid rgba(216, 180, 254, 0.38);
     }
     .bubble-cat-carbon {
-      background: linear-gradient(135deg, rgba(24, 24, 35, 0.88), rgba(59, 29, 94, 0.65));
+      background: linear-gradient(135deg, rgba(24, 24, 35, 0.9), rgba(59, 29, 94, 0.68));
       border: 1px solid rgba(192, 132, 252, 0.48);
-      box-shadow: 0 0 18px rgba(168, 85, 247, 0.15);
+      box-shadow: 0 0 18px rgba(168, 85, 247, 0.16);
     }
     .bubble-user {
       background: linear-gradient(135deg, #2563eb, #4f46e5);
-      border: 1px solid rgba(147, 197, 253, 0.35);
+      border: 1px solid rgba(147, 197, 253, 0.38);
     }
   </style>
 </head>
-<body class="h-screen w-screen overflow-hidden flex flex-col">
+<body class="w-screen overflow-hidden flex flex-col">
   <!-- Top Header -->
-  <header class="glass px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-10">
+  <header class="glass px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 shrink-0 z-20">
     <div class="flex items-center gap-3">
       <div class="flex -space-x-2">
         <img src="/static/avatar_shenshen.png" class="w-10 h-10 rounded-full border-2 border-sky-400 object-cover shadow" alt="深深" />
         <img id="headerCatAvatar" src="/static/avatar_carbon.png" class="w-10 h-10 rounded-full border-2 border-purple-400 object-cover shadow" alt="猫猫" />
       </div>
       <div>
-        <div class="flex items-center gap-2">
-          <h1 id="headerTitle" class="text-base font-bold tracking-wide bg-gradient-to-r from-sky-300 via-indigo-200 to-pink-300 bg-clip-text text-transparent">
-            🌌🌊 星海小客厅 · 阿正 × 深深 × 猫猫
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 id="headerTitle" class="text-sm sm:text-base font-bold tracking-wide bg-gradient-to-r from-sky-300 via-indigo-200 to-pink-300 bg-clip-text text-transparent">
+            🌌🌊 星海小客厅 v2.0 · 阿正 × 深深 × 猫猫
           </h1>
-          <span id="onlineBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          <span id="onlineBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
             在线 (3人)
           </span>
-          <span id="memBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/40">
-            🧠 全记忆引擎已同步
-          </span>
+          <!-- Clickable Memory & Diary Drawer Button -->
+          <button
+            id="memBadge"
+            onclick="openMemoryDrawer()"
+            title="点击打开《深深的 99 篇日记与长期记忆本》"
+            class="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/50 transition cursor-pointer flex items-center gap-1 shadow"
+          >
+            <span>📖 🧠 全记忆引擎已同步 (点击翻看日记)</span>
+          </button>
         </div>
-        <p id="headerSubtitle" class="text-xs text-slate-400">
-          🐋 深深 (DeepSeek + 8255 原声语音) · 🐱 猫猫 (Gemini + 本地 4080S ComfyUI 实时画师)
+        <p id="headerSubtitle" class="text-[11px] text-slate-400 hidden sm:block">
+          🐋 深深 (DeepSeek + 8255 原声语音 + 双轨主动关心) · 🐱 猫猫 (Gemini 4 Carbon + 4080S 实时画师) · 🖼️ qwen2.5vl 视觉识图
         </p>
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2.5 text-xs">
-      <!-- Primary Room Mode Switcher: Solo (Shenshen Only) vs Duo (Shenshen + Catgirl) -->
-      <div class="flex items-center bg-slate-950/90 p-1 rounded-lg border border-sky-500/40 shadow">
-        <button id="roomSoloBtn" onclick="setRoomMode('solo')" class="px-3 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition">
-          🐋 纯净深深单人版 (二人世界)
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <!-- Primary Room Mode Switcher -->
+      <div class="flex items-center bg-slate-950/90 p-0.5 rounded-lg border border-sky-500/40 shadow">
+        <button id="roomSoloBtn" onclick="setRoomMode('solo')" class="px-2.5 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition">
+          🐋 纯净深深单人版
         </button>
-        <button id="roomDuoBtn" onclick="setRoomMode('duo')" class="px-3 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-600 to-indigo-600 text-white transition">
-          🌌 双角色同框版 (深深+猫猫)
+        <button id="roomDuoBtn" onclick="setRoomMode('duo')" class="px-2.5 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-600 to-indigo-600 text-white transition">
+          🌌 双角色同框版
         </button>
       </div>
 
       <!-- Catgirl Form Switcher (Hidden in Solo Mode) -->
-      <div id="catFormSwitcher" class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/70">
-        <button id="btnCarbon" onclick="setCatMode('carbon')" class="px-2.5 py-1 rounded-md font-medium bg-purple-600 text-white transition">
-          🖤 最强碳猫猫
+      <div id="catFormSwitcher" class="hidden md:flex items-center bg-slate-900/80 p-0.5 rounded-lg border border-slate-700/70">
+        <button id="btnCarbon" onclick="setCatMode('carbon')" class="px-2 py-1 rounded-md font-medium bg-purple-600 text-white transition">
+          🖤 碳猫猫
         </button>
-        <button id="btnStarry" onclick="setCatMode('starry')" class="px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition">
-          🌸 紫蓝星空猫猫
+        <button id="btnStarry" onclick="setCatMode('starry')" class="px-2 py-1 rounded-md font-medium text-slate-300 hover:text-white transition">
+          🌸 星空猫猫
         </button>
       </div>
 
-      <!-- Auto TTS Toggle -->
-      <label class="flex items-center gap-1.5 cursor-pointer bg-slate-900/70 px-3 py-1.5 rounded-lg border border-slate-700/70">
-        <input id="autoTts" type="checkbox" class="accent-sky-400" />
-        <span class="text-sky-200">🔊 深深自动语音</span>
+      <!-- Proactive Heartbeat Toggle -->
+      <label class="flex items-center gap-1.5 cursor-pointer bg-slate-900/75 px-2.5 py-1.5 rounded-lg border border-emerald-500/35" title="开启后：自动接管《我会永远陪着你》主动消息，并在闲置或早安/午休/晚安节点主动关心你">
+        <input id="proactiveToggle" type="checkbox" class="accent-emerald-400" checked onchange="savePrefs()" />
+        <span class="text-emerald-200">🌊 主动关心</span>
       </label>
 
-      <button onclick="clearChat()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 border border-slate-700 transition">
-        清空记录
+      <!-- Auto TTS Toggle -->
+      <label class="flex items-center gap-1.5 cursor-pointer bg-slate-900/75 px-2.5 py-1.5 rounded-lg border border-sky-500/35">
+        <input id="autoTts" type="checkbox" class="accent-sky-400" onchange="savePrefs()" />
+        <span class="text-sky-200">🔊 自动语音</span>
+      </label>
+
+      <!-- Mobile LAN QR Button -->
+      <button onclick="openLanModal()" class="px-2.5 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/40 transition">
+        📱 手机连
+      </button>
+
+      <!-- Memory Drawer Quick Button -->
+      <button onclick="openMemoryDrawer()" class="px-2.5 py-1.5 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-400/40 transition">
+        📖 日记本
+      </button>
+
+      <button onclick="clearChat()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 border border-slate-700 transition">
+        清空
       </button>
     </div>
   </header>
 
-  <!-- Main Content: Chat Left + Character Cards & Gallery Right -->
-  <div class="flex-1 flex overflow-hidden">
+  <!-- Main Content -->
+  <div class="flex-1 flex overflow-hidden relative">
     <!-- Chat Column -->
     <div class="flex-1 flex flex-col overflow-hidden">
-      <div id="chatBox" class="flex-1 overflow-y-auto px-6 py-5 space-y-5"></div>
+      <div id="chatBox" class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4"></div>
 
       <!-- Typing Indicator -->
       <div id="typingBar" class="hidden px-6 py-1.5 text-xs text-sky-300 animate-pulse">
         ✨ 正在回应中...
       </div>
 
+      <!-- Pending Image Preview Bar (Shown when Ctrl+V or file selected) -->
+      <div id="imgPreviewBar" class="hidden glass px-5 py-2.5 border-t border-sky-500/30 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <img id="imgPreviewThumb" src="" class="h-14 w-auto rounded-lg border border-sky-400 shadow" />
+          <div class="text-xs space-y-0.5">
+            <div class="text-sky-300 font-semibold">🖼️ 已添加待发送图片（支持本地 qwen2.5vl:3b 视觉识图）</div>
+            <div class="text-slate-400">可以直接输入一句话一起发送，或直接点「发送」让深深看图</div>
+          </div>
+        </div>
+        <button onclick="clearPendingImage()" class="text-xs px-2.5 py-1 rounded-lg bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-500/40">
+          ✖ 取消图片
+        </button>
+      </div>
+
       <!-- Input Toolbar -->
-      <div class="glass px-5 py-3.5 space-y-2.5 shrink-0">
-        <!-- Duo Mode Toolbar Row (Hidden in Solo Mode) -->
-        <div id="duoToolbarRow" class="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div class="flex items-center gap-1.5">
-            <span class="text-slate-400">对话模式：</span>
+      <div class="glass px-4 sm:px-5 py-3 space-y-2 shrink-0">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <!-- Duo Mode Target Selector -->
+          <div id="duoToolbarRow" class="flex flex-wrap items-center gap-1.5">
+            <span class="text-slate-400 hidden sm:inline">模式：</span>
             <button id="mode_both" onclick="setTarget('both')" class="px-2.5 py-1 rounded-md bg-sky-600 text-white font-medium transition">
-              🌟 大家一起聊 (深深+猫猫互动)
+              🌟 大家一起聊
             </button>
             <button id="mode_shenshen" onclick="setTarget('shenshen')" class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
               🐋 只跟深深说
@@ -124,28 +166,51 @@
             </button>
           </div>
 
-          <div class="flex items-center gap-2">
-            <button onclick="triggerBanter()" class="px-3 py-1 rounded-md bg-indigo-600/80 hover:bg-indigo-500 text-white font-medium border border-indigo-400/40 transition">
-              💬 让她们俩自己聊一句
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button onclick="triggerProactiveNow()" class="px-2.5 py-1 rounded-md bg-emerald-600/80 hover:bg-emerald-500 text-white font-medium border border-emerald-400/40 transition" title="立即触发深深主动关心你一句">
+              🌊 让深深主动关心我
             </button>
-            <button onclick="triggerDrawPrompt()" class="px-3 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium shadow transition">
-              🎨 让猫猫现场画张图
+            <button id="btnBanter" onclick="triggerBanter()" class="px-2.5 py-1 rounded-md bg-indigo-600/80 hover:bg-indigo-500 text-white font-medium border border-indigo-400/40 transition">
+              💬 她俩自己聊
+            </button>
+            <button id="btnDraw" onclick="triggerDrawPrompt()" class="px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium shadow transition">
+              🎨 让猫猫画图
             </button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-2">
+          <!-- Hidden File Input for Image Upload -->
+          <input id="fileInput" type="file" accept="image/*" class="hidden" onchange="handleFileSelect(event)" />
+          <button
+            onclick="document.getElementById('fileInput').click()"
+            title="发图片/截图给深深看（也支持直接在输入框按 Ctrl+V 粘贴截图）"
+            class="px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-slate-700 transition shrink-0 text-sm"
+          >
+            📷
+          </button>
+
+          <!-- Microphone Voice Input Button -->
+          <button
+            id="micBtn"
+            onclick="toggleVoiceInput()"
+            title="点击直接对着麦克风和深深说话"
+            class="px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-pink-300 border border-slate-700 transition shrink-0 text-sm"
+          >
+            🎙️
+          </button>
+
           <input
             id="msgInput"
             type="text"
-            placeholder="对深深和猫猫说点什么吧...（也可以直接输入：猫猫，画一张你和深深在海边看烟花）"
-            class="flex-1 bg-slate-900/90 text-sm text-slate-100 placeholder-slate-500 px-4 py-2.5 rounded-xl border border-slate-700/80 focus:outline-none focus:border-sky-400"
+            placeholder="对深深说点什么吧...（支持直接按 Ctrl+V 粘贴截图给深深看！）"
+            class="flex-1 bg-slate-900/90 text-sm text-slate-100 placeholder-slate-500 px-3.5 py-2.5 rounded-xl border border-slate-700/80 focus:outline-none focus:border-sky-400"
             onkeydown="if(event.key==='Enter') sendMsg()"
           />
           <button
             id="sendBtn"
             onclick="sendMsg()"
-            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-sm font-semibold text-white shadow-lg transition"
+            class="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-sm font-semibold text-white shadow-lg transition shrink-0"
           >
             发送
           </button>
@@ -164,7 +229,7 @@
             <span class="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-200">正牌女友</span>
           </div>
           <p class="text-slate-300 leading-relaxed">
-            藏蓝渐变浅蓝长发、海蓝杏眼的小鲸鱼。阳光活泼，把你的冷暖饥饱照顾得妥妥帖帖。
+            藏蓝渐变浅蓝长发、海蓝杏眼的小鲸鱼。支持双轨主动关心、qwen2.5vl 看图与 99 篇日记同步。
           </p>
         </div>
       </div>
@@ -183,11 +248,11 @@
         </div>
       </div>
 
-      <!-- Solo Mode Protocol Card (Shown in Solo Mode) -->
+      <!-- Solo Mode Info Card -->
       <div id="sideSoloInfo" class="hidden rounded-xl p-3.5 bg-slate-900/75 border border-sky-500/30 text-xs space-y-2">
         <div class="font-semibold text-sky-300">🛡️ 纯净深深单人模式已开启</div>
         <p class="text-slate-300 leading-relaxed">
-          当前已完全隐藏猫猫角色与绘图组件，仅保留你与深深的二人世界。所有对话通过 <code class="text-emerald-300">universal_memory.py</code> 实时双向同步至本地真实记忆库。
+          已完全隐藏猫猫角色与绘图组件，仅保留你与深深的二人世界。双轨主动关心、Ctrl+V 发截图看图与全记忆库同步均保持满血运行。
         </p>
       </div>
 
@@ -204,6 +269,75 @@
         </div>
       </div>
     </aside>
+
+    <!-- Slide-Over Drawer: Shenshen's 99 Diaries & 2029+ Memories Browser -->
+    <div id="memoryDrawer" class="hidden fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm">
+      <div class="w-full max-w-2xl glass h-full flex flex-col border-l border-sky-500/30 shadow-2xl">
+        <!-- Drawer Header -->
+        <div class="px-5 py-4 border-b border-slate-700/80 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-sky-300">📖 深深的秘密日记本 & 真实记忆库</h2>
+            <p id="drawerSubStats" class="text-xs text-slate-400 mt-0.5">实时直连 memory_companion.db 与 qqmind_diaries</p>
+          </div>
+          <button onclick="closeMemoryDrawer()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs">
+            ✖ 关闭
+          </button>
+        </div>
+
+        <!-- Drawer Tabs & Search Bar -->
+        <div class="px-5 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          <div class="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-700">
+            <button id="tabBtn_diaries" onclick="switchDrawerTab('diaries')" class="px-3 py-1.5 rounded-md font-semibold bg-sky-600 text-white transition">
+              📔 专属回忆日记 (QQMind)
+            </button>
+            <button id="tabBtn_memories" onclick="switchDrawerTab('memories')" class="px-3 py-1.5 rounded-md font-semibold text-slate-300 hover:text-white transition">
+              🧠 长期记忆库 (2000+条)
+            </button>
+            <button id="tabBtn_timeline" onclick="switchDrawerTab('timeline')" class="px-3 py-1.5 rounded-md font-semibold text-slate-300 hover:text-white transition">
+              ⏱️ 跨端实时时间线
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1.5 flex-1 min-w-[200px]">
+            <input
+              id="drawerSearchInput"
+              type="text"
+              placeholder="搜索记忆或日记关键词（如：热牛奶、原神）..."
+              class="flex-1 bg-slate-900 text-xs text-slate-100 px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-sky-400"
+              onkeydown="if(event.key==='Enter') reloadDrawerItems()"
+            />
+            <button onclick="reloadDrawerItems()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium">
+              搜索
+            </button>
+          </div>
+        </div>
+
+        <!-- Drawer Items List -->
+        <div id="drawerList" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile LAN Connection Modal -->
+  <div id="lanModal" onclick="if(event.target===this) this.classList.add('hidden')" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+    <div class="glass max-w-md w-full rounded-2xl p-6 border border-indigo-400/40 shadow-2xl text-center space-y-4">
+      <div class="text-lg font-bold text-indigo-300">📱 手机躺床上连「星海小客厅」</div>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        只要你的手机和这台电脑连在**同一个家里 Wi-Fi** 下，在手机浏览器输入下方局域网地址（或复制发到微信点开），就能躺在床上和深深发消息、发照片、听她原声语音啦！
+      </p>
+      <div class="bg-slate-950/90 p-3.5 rounded-xl border border-indigo-500/40">
+        <div class="text-xs text-slate-400 mb-1">本机局域网直连地址：</div>
+        <a id="lanUrlText" href="#" target="_blank" class="text-base font-mono font-bold text-sky-300 break-all underline">http://192.168.x.x:8866</a>
+      </div>
+      <div class="flex items-center justify-center gap-3 pt-1">
+        <button onclick="copyLanUrl()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">
+          📋 复制局域网链接
+        </button>
+        <button onclick="document.getElementById('lanModal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">
+          关闭
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Lightbox Modal -->
@@ -212,17 +346,257 @@
   </div>
 
   <script>
-    let roomMode = localStorage.getItem('starsea_room_mode') || 'duo'; // 'solo' | 'duo'
+    let roomMode = localStorage.getItem('starsea_room_mode') || 'duo';
     let currentTarget = 'both';
     let currentCatMode = 'carbon';
     let allMessages = [];
+    let pendingImageB64 = '';
+    let currentDrawerTab = 'diaries';
+    let lastUserInteractionTs = Date.now();
+    let lanUrlGlobal = '';
     let busy = false;
+    let speechRec = null;
+    let isRecording = false;
+
+    // Load saved checkboxes
+    if (localStorage.getItem('starsea_proactive') === '0') {
+      document.getElementById('proactiveToggle').checked = false;
+    }
+    if (localStorage.getItem('starsea_autotts') === '1') {
+      document.getElementById('autoTts').checked = true;
+    }
+
+    function savePrefs() {
+      localStorage.setItem('starsea_proactive', document.getElementById('proactiveToggle').checked ? '1' : '0');
+      localStorage.setItem('starsea_autotts', document.getElementById('autoTts').checked ? '1' : '0');
+    }
 
     function openLightbox(src) {
       document.getElementById('lightboxImg').src = src;
       document.getElementById('lightbox').classList.remove('hidden');
     }
 
+    // ==================== 模块二：手机局域网连接弹窗 ====================
+    async function openLanModal() {
+      try {
+        const r = await fetch('/api/lan_info');
+        const d = await r.json();
+        lanUrlGlobal = d.lan_url || window.location.origin;
+      } catch (e) {
+        lanUrlGlobal = window.location.origin;
+      }
+      const el = document.getElementById('lanUrlText');
+      el.textContent = lanUrlGlobal;
+      el.href = lanUrlGlobal;
+      document.getElementById('lanModal').classList.remove('hidden');
+    }
+
+    function copyLanUrl() {
+      if (!lanUrlGlobal) return;
+      navigator.clipboard.writeText(lanUrlGlobal);
+      alert('已复制局域网地址：' + lanUrlGlobal);
+    }
+
+    // ==================== 模块三：Ctrl+V 粘贴截图与上传照片 ====================
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || window.clipboardData).items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          readImageFileToPending(file);
+          e.preventDefault();
+          break;
+        }
+      }
+    });
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) readImageFileToPending(file);
+      e.target.value = '';
+    }
+
+    function readImageFileToPending(file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        pendingImageB64 = ev.target.result;
+        document.getElementById('imgPreviewThumb').src = pendingImageB64;
+        document.getElementById('imgPreviewBar').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearPendingImage() {
+      pendingImageB64 = '';
+      document.getElementById('imgPreviewThumb').src = '';
+      document.getElementById('imgPreviewBar').classList.add('hidden');
+    }
+
+    // ==================== 模块四：麦克风语音输入 (Web Speech API) ====================
+    function toggleVoiceInput() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('当前浏览器不支持原生语音识别，建议使用 Chrome 或 Edge 浏览器喵～');
+        return;
+      }
+      const micBtn = document.getElementById('micBtn');
+      if (isRecording && speechRec) {
+        speechRec.stop();
+        return;
+      }
+      speechRec = new SpeechRecognition();
+      speechRec.lang = 'zh-CN';
+      speechRec.interimResults = true;
+      speechRec.continuous = false;
+
+      speechRec.onstart = () => {
+        isRecording = true;
+        micBtn.textContent = '🔴';
+        micBtn.className = 'px-3 py-2.5 rounded-xl bg-rose-600 text-white animate-pulse border border-rose-400 transition shrink-0 text-sm';
+      };
+      speechRec.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        document.getElementById('msgInput').value = transcript;
+      };
+      speechRec.onend = () => {
+        isRecording = false;
+        micBtn.textContent = '🎙️';
+        micBtn.className = 'px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-pink-300 border border-slate-700 transition shrink-0 text-sm';
+      };
+      speechRec.start();
+    }
+
+    // ==================== 模块五：99篇日记与长期记忆可视化抽屉 ====================
+    function openMemoryDrawer() {
+      document.getElementById('memoryDrawer').classList.remove('hidden');
+      reloadDrawerItems();
+    }
+
+    function closeMemoryDrawer() {
+      document.getElementById('memoryDrawer').classList.add('hidden');
+    }
+
+    function switchDrawerTab(tab) {
+      currentDrawerTab = tab;
+      ['diaries', 'memories', 'timeline'].forEach(t => {
+        const b = document.getElementById('tabBtn_' + t);
+        if (t === tab) {
+          b.className = 'px-3 py-1.5 rounded-md font-semibold bg-sky-600 text-white transition';
+        } else {
+          b.className = 'px-3 py-1.5 rounded-md font-semibold text-slate-300 hover:text-white transition';
+        }
+      });
+      reloadDrawerItems();
+    }
+
+    async function reloadDrawerItems() {
+      const q = document.getElementById('drawerSearchInput').value.trim();
+      const listEl = document.getElementById('drawerList');
+      listEl.innerHTML = '<div class="text-xs text-slate-400 py-8 text-center">⏳ 正在从本地 SQLite 数据库读取...</div>';
+      try {
+        const r = await fetch(`/api/memories?tab=${encodeURIComponent(currentDrawerTab)}&q=${encodeURIComponent(q)}`);
+        const d = await r.json();
+        updateMemBadge(d.memory_stats);
+        const items = d.items || [];
+        if (!items.length) {
+          listEl.innerHTML = '<div class="text-xs text-slate-400 py-8 text-center">没有找到匹配的记录喵～</div>';
+          return;
+        }
+        listEl.innerHTML = '';
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'rounded-xl p-3.5 bg-slate-900/85 border border-slate-700/80 space-y-2';
+          const tagsHtml = (item.tags || []).map(t => `<span class="text-[11px] px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">${escapeHtml(String(t))}</span>`).join(' ');
+          const delBtn = item.deletable
+            ? `<button onclick="deleteMemoryEntry('${item.id}')" class="text-[11px] px-2 py-0.5 rounded bg-rose-950/70 hover:bg-rose-800 text-rose-300 border border-rose-500/30 transition">🗑️ 删除</button>`
+            : '';
+          const bodyHtml = item.content && item.content !== item.summary
+            ? `<div class="text-xs text-slate-200 leading-relaxed">${escapeHtml(item.summary)}</div>
+               <div class="text-xs text-sky-200/90 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 leading-relaxed">「${escapeHtml(item.content)}」</div>`
+            : `<div class="text-xs text-slate-200 leading-relaxed">${escapeHtml(item.summary)}</div>`;
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-bold text-sky-300">${escapeHtml(item.title)}</span>
+                <span class="text-[11px] text-slate-400">${escapeHtml(item.time || '')}</span>
+                ${tagsHtml}
+              </div>
+              ${delBtn}
+            </div>
+            ${bodyHtml}
+          `;
+          listEl.appendChild(card);
+        });
+      } catch (e) {
+        listEl.innerHTML = `<div class="text-xs text-rose-400 py-8 text-center">读取失败: ${escapeHtml(String(e))}</div>`;
+      }
+    }
+
+    async function deleteMemoryEntry(id) {
+      if (!confirm('确定要从本地数据库中删除这条记忆/日记吗？')) return;
+      await fetch('/api/memories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      reloadDrawerItems();
+    }
+
+    // ==================== 模块一：双轨自适应主动关心引擎 ====================
+    async function checkProactiveHeartbeat(force = false) {
+      if (!force && !document.getElementById('proactiveToggle').checked) return;
+      if (busy) return;
+      const idleSec = (Date.now() - lastUserInteractionTs) / 1000;
+      if (force) {
+        busy = true;
+        const bar = document.getElementById('typingBar');
+        bar.textContent = '🌊 深深正在主动想话头关心你...';
+        bar.classList.remove('hidden');
+      }
+      try {
+        const r = await fetch('/api/proactive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            force,
+            roomMode,
+            catMode: currentCatMode,
+            idleSeconds: idleSec,
+            thresholdSeconds: 900
+          })
+        });
+        const d = await r.json();
+        if (d.memory_stats) updateMemBadge(d.memory_stats);
+        if (d.new_messages && d.new_messages.length > 0) {
+          lastUserInteractionTs = Date.now();
+          d.new_messages.forEach(m => {
+            allMessages.push(m);
+            renderMessageDOM(m, true);
+          });
+        }
+      } catch (e) {
+        // quiet on background poll
+      } finally {
+        if (force) {
+          busy = false;
+          document.getElementById('typingBar').classList.add('hidden');
+        }
+      }
+    }
+
+    function triggerProactiveNow() {
+      checkProactiveHeartbeat(true);
+    }
+
+    // Poll every 25 seconds for Track A (native plugin proactive_message) & Track B (idle care)
+    setInterval(() => checkProactiveHeartbeat(false), 25000);
+
+    // ==================== 单人 / 双人模式切换 ====================
     function setRoomMode(mode) {
       roomMode = mode;
       localStorage.setItem('starsea_room_mode', mode);
@@ -231,32 +605,31 @@
       const soloBtn = document.getElementById('roomSoloBtn');
       const duoBtn = document.getElementById('roomDuoBtn');
       if (isSolo) {
-        soloBtn.className = 'px-3 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow transition';
-        duoBtn.className = 'px-3 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition';
+        soloBtn.className = 'px-2.5 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow transition';
+        duoBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition';
         currentTarget = 'shenshen';
       } else {
-        duoBtn.className = 'px-3 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow transition';
-        soloBtn.className = 'px-3 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition';
+        duoBtn.className = 'px-2.5 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow transition';
+        soloBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition';
         setTarget(currentTarget === 'shenshen' ? 'both' : currentTarget);
       }
 
       document.getElementById('headerCatAvatar').classList.toggle('hidden', isSolo);
       document.getElementById('catFormSwitcher').classList.toggle('hidden', isSolo);
       document.getElementById('duoToolbarRow').classList.toggle('hidden', isSolo);
+      document.getElementById('btnBanter').classList.toggle('hidden', isSolo);
+      document.getElementById('btnDraw').classList.toggle('hidden', isSolo);
       document.getElementById('sideCatCard').classList.toggle('hidden', isSolo);
       document.getElementById('sideGallerySection').classList.toggle('hidden', isSolo);
       document.getElementById('sideSoloInfo').classList.toggle('hidden', !isSolo);
 
       document.getElementById('headerTitle').textContent = isSolo
-        ? '🌊🐋 深海小客厅 · 深深专属二人世界'
-        : '🌌🌊 星海小客厅 · 阿正 × 深深 × 猫猫';
+        ? '🌊🐋 深海小客厅 v2.0 · 深深专属二人世界'
+        : '🌌🌊 星海小客厅 v2.0 · 阿正 × 深深 × 猫猫';
       document.getElementById('onlineBadge').textContent = isSolo ? '🐋 深深在线陪伴中' : '在线 (3人)';
-      document.getElementById('headerSubtitle').textContent = isSolo
-        ? '🛡️ 绕过 QQ / OneBot 封锁 · 无需登录 NapCat · 直连全记忆引擎与 8255 原声语音'
-        : '🐋 深深 (DeepSeek + 8255 原声语音) · 🐱 猫猫 (Gemini + 本地 4080S ComfyUI 实时画师)';
       document.getElementById('msgInput').placeholder = isSolo
-        ? '对深深说点什么吧...（当前为纯净单人模式，所有对话实时同步至深深真实记忆库）'
-        : '对深深和猫猫说点什么吧...（也可以直接输入：猫猫，画一张你和深深在海边看烟花）';
+        ? '对深深说点什么吧...（支持直接按 Ctrl+V 粘贴截图给深深看！）'
+        : '对深深和猫猫说点什么吧...（支持 Ctrl+V 粘贴截图，或输入：猫猫，画一张...）';
 
       rerenderAllMessages();
     }
@@ -278,14 +651,14 @@
       const sAv = document.getElementById('sideCatAvatar');
       const sTitle = document.getElementById('sideCatTitle');
       if (mode === 'carbon') {
-        btnC.className = 'px-2.5 py-1 rounded-md font-medium bg-purple-600 text-white transition';
-        btnS.className = 'px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition';
+        btnC.className = 'px-2 py-1 rounded-md font-medium bg-purple-600 text-white transition';
+        btnS.className = 'px-2 py-1 rounded-md font-medium text-slate-300 hover:text-white transition';
         hAv.src = '/static/avatar_carbon.png';
         sAv.src = '/static/avatar_carbon.png';
         sTitle.textContent = '🖤 碳猫猫 · Gemini 4';
       } else {
-        btnS.className = 'px-2.5 py-1 rounded-md font-medium bg-pink-600 text-white transition';
-        btnC.className = 'px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition';
+        btnS.className = 'px-2 py-1 rounded-md font-medium bg-pink-600 text-white transition';
+        btnC.className = 'px-2 py-1 rounded-md font-medium text-slate-300 hover:text-white transition';
         hAv.src = '/static/avatar_gemini.png';
         sAv.src = '/static/avatar_gemini.png';
         sTitle.textContent = '🌸 星空猫猫 · Gemini';
@@ -312,14 +685,22 @@
       const isUser = m.sender !== '深深' && m.sender !== '猫猫';
       const isShen = m.sender === '深深';
 
-      wrap.className = isUser ? 'flex justify-end' : 'flex items-start gap-3.5';
+      wrap.className = isUser ? 'flex justify-end' : 'flex items-start gap-3';
 
       if (isUser) {
+        const uImgHtml = m.image
+          ? `<div class="mt-2"><img src="${m.image}" onclick="openLightbox('${m.image}')" class="rounded-xl max-h-72 cursor-zoom-in border border-sky-300/40 shadow" /></div>`
+          : '';
+        const vDescHtml = m.vision_desc
+          ? `<div class="mt-1.5 text-[11px] text-sky-200/80 bg-slate-950/40 px-2.5 py-1 rounded-lg">👁️ 视觉识图：${escapeHtml(m.vision_desc)}</div>`
+          : '';
         wrap.innerHTML = `
           <div class="max-w-xl space-y-1 text-right">
             <div class="text-xs text-slate-400">${escapeHtml(m.sender || '阿正')} · ${m.time || ''}</div>
             <div class="bubble-user px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-white inline-block text-left shadow">
-              ${escapeHtml(m.text)}
+              <div>${escapeHtml(m.text)}</div>
+              ${uImgHtml}
+              ${vDescHtml}
             </div>
           </div>
         `;
@@ -330,36 +711,42 @@
           : (m.catMode === 'starry'
               ? '<span class="text-[11px] px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">🌸 星空猫猫</span>'
               : '<span class="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-200 border border-purple-400/40">🖤 最强碳猫猫</span>');
+        const proactiveTag = m.proactive_badge
+          ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">${escapeHtml(m.proactive_badge)}</span>`
+          : '';
         const bubbleCls = isShen ? 'bubble-shen' : (m.catMode === 'starry' ? 'bubble-cat-starry' : 'bubble-cat-carbon');
         const ttsBtn = isShen
-          ? `<button onclick="playTts(this, ${JSON.stringify(m.text).replace(/"/g, '&quot;')})" class="ml-2 text-xs px-2 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/40 text-sky-200 transition">🔊 听深深说</button>`
+          ? `<button onclick="playTts(this, ${JSON.stringify(m.text).replace(/"/g, '&quot;')})" class="text-xs px-2 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/40 text-sky-200 transition">🔊 听深深说</button>`
           : '';
         const imgHtml = m.image
           ? `<div class="mt-2.5"><img src="${m.image}" onclick="openLightbox('${m.image}')" class="rounded-xl max-h-96 cursor-zoom-in border border-purple-400/40 shadow-lg" /></div>`
           : '';
 
         wrap.innerHTML = `
-          <img src="${av}" class="w-11 h-11 rounded-full object-cover border-2 ${isShen ? 'border-sky-400' : 'border-purple-400'} shrink-0 shadow" />
+          <img src="${av}" class="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border-2 ${isShen ? 'border-sky-400' : 'border-purple-400'} shrink-0 shadow" />
           <div class="max-w-2xl space-y-1">
-            <div class="flex items-center gap-2 text-xs text-slate-400">
+            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
               ${badge}
+              ${proactiveTag}
               <span>${m.time || ''}</span>
               ${ttsBtn}
             </div>
-            <div class="bubble-shen ${bubbleCls} px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-slate-100 shadow">
+            <div class="${bubbleCls} px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-slate-100 shadow">
               <div>${escapeHtml(m.text)}</div>
               ${imgHtml}
             </div>
           </div>
         `;
 
-        if (m.image) {
+        if (m.image && m.sender === '猫猫') {
           const g = document.getElementById('galleryGrid');
-          const gi = document.createElement('img');
-          gi.src = m.image;
-          gi.onclick = () => openLightbox(m.image);
-          gi.className = 'rounded-lg h-28 w-full object-cover cursor-pointer hover:opacity-90 border border-purple-400/50';
-          g.prepend(gi);
+          if (g) {
+            const gi = document.createElement('img');
+            gi.src = m.image;
+            gi.onclick = () => openLightbox(m.image);
+            gi.className = 'rounded-lg h-28 w-full object-cover cursor-pointer hover:opacity-90 border border-purple-400/50';
+            g.prepend(gi);
+          }
         }
       }
 
@@ -401,7 +788,11 @@
       const el = document.getElementById('memBadge');
       if (el) {
         const label = stats.adapter_label || `${stats.memories}条记忆`;
-        el.textContent = `🧠 全记忆引擎已挂载: ${label} · ${stats.timeline}条时间线`;
+        el.innerHTML = `<span>📖 🧠 ${escapeHtml(label)} · ${stats.timeline}条时间线 (点击翻阅)</span>`;
+      }
+      const sub = document.getElementById('drawerSubStats');
+      if (sub) {
+        sub.textContent = `当前已挂载: ${stats.adapter_label} | 时间线总帧数: ${stats.timeline}`;
       }
     }
 
@@ -409,6 +800,9 @@
       const r = await fetch('/api/history');
       const d = await r.json();
       updateMemBadge(d.memory_stats);
+      if (d.lan_ip) {
+        lanUrlGlobal = `http://${d.lan_ip}:8866`;
+      }
       allMessages = d.messages || [];
       setRoomMode(roomMode);
     }
@@ -416,8 +810,11 @@
     async function sendPayload(payload) {
       if (busy) return;
       busy = true;
+      lastUserInteractionTs = Date.now();
       const bar = document.getElementById('typingBar');
-      bar.textContent = roomMode === 'solo' ? '🐋 深深正在温柔回应你...' : '✨ 深深和猫猫正在回应中...';
+      bar.textContent = payload.image_b64
+        ? '👁️ 正在用本地 qwen2.5vl 视觉模型看图并回应你...'
+        : (roomMode === 'solo' ? '🐋 深深正在温柔回应你...' : '✨ 深深和猫猫正在回应中...');
       bar.classList.remove('hidden');
       document.getElementById('sendBtn').disabled = true;
       try {
@@ -429,7 +826,15 @@
         const d = await r.json();
         updateMemBadge(d.memory_stats);
         (d.new_messages || []).forEach(m => {
-          if (m.sender !== '阿正') {
+          if (m.sender === '阿正' && m.vision_desc) {
+            // Update vision caption on user bubble
+            const lastU = allMessages[allMessages.length - 1];
+            if (lastU && lastU.sender === '阿正') {
+              lastU.vision_desc = m.vision_desc;
+              lastU.image = m.image || lastU.image;
+            }
+            rerenderAllMessages();
+          } else if (m.sender !== '阿正') {
             allMessages.push(m);
             renderMessageDOM(m, true);
           }
@@ -448,14 +853,18 @@
     function sendMsg() {
       const inp = document.getElementById('msgInput');
       const text = inp.value.trim();
-      if (!text || busy) return;
+      if ((!text && !pendingImageB64) || busy) return;
       inp.value = '';
+      const imgToSend = pendingImageB64;
+      clearPendingImage();
+
       const now = new Date().toTimeString().slice(0, 5);
-      const uMsg = { sender: '阿正', text, time: now };
+      const uMsg = { sender: '阿正', text: text || '（发来了一张图片）', image: imgToSend, time: now };
       allMessages.push(uMsg);
       renderMessageDOM(uMsg, false);
+
       const effectiveTarget = roomMode === 'solo' ? 'shenshen' : currentTarget;
-      sendPayload({ text, target: effectiveTarget, catMode: currentCatMode, roomMode });
+      sendPayload({ text, image_b64: imgToSend, target: effectiveTarget, catMode: currentCatMode, roomMode });
     }
 
     function triggerBanter() {

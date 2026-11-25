@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
-"""
-星海小客厅 · 阿正 × 深深 (DeepSeek) × 猫猫 (Gemini) 本地网页聊天服务 (模式 A：双向完全打通深深真实记忆库)
-端口: http://127.0.0.1:8866
-直连 D:\\AstrBot\\data\\plugin_data\\astrbot_plugin_memory_companion\\memory_companion.db:
-1. 实时读取深深的长期记忆 (memories + memory_fts) 与最新 QQ 实时对话时间线 (timeline)
-2. 实时将星海小客厅中的对话写回 timeline + memories + memory_fts + memory_embeddings (11434 nomic-embed-text)
+r"""
+星海小客厅 v2.0 · 阿正 × 深深 (DeepSeek) × 猫猫 (Gemini 4 Carbon) 本地一体化全功能 Web 网关
+监听端口: http://0.0.0.0:8866 (本机 http://127.0.0.1:8866 & 手机局域网 http://192.168.x.x:8866)
+
+核心特性:
+  1. 顶部一键切换「🐋 纯净深深单人模式 (二人世界)」⇄「🌌 双角色同框模式 (深深+猫猫)」
+  2. 全记忆插件自适应引擎 (universal_memory.py): 通吃 memory_companion + qqmind (99篇日记) + 任意第三方 SQLite 记忆插件 + 原生 data_v4.db
+  3. 🌊 双轨自适应主动关心引擎 (/api/proactive):
+     - 轨道 A: 实时联动接管《我会永远陪着你 (private_companion)》写入 timeline 的原生 proactive_message
+     - 轨道 B: 当使用无主动功能的其他插件或未启动 AstrBot 时，内置日程/闲置主动关心引擎自动顶上并写回记忆库
+  4. 🖼️ 多模态视觉识图桥: 支持 Ctrl+V 粘贴截图 / 手机传图，调用本地 Ollama qwen2.5vl:3b 识图并写入 image_observation 记忆
+  5. 📱 手机局域网扫码上床聊 (/api/lan_info): 自动探测局域网 IP 并支持前端一键生成扫码卡片与 PWA 手机全屏体验
+  6. 📖 99 篇日记与 2029+ 条长期记忆可视化抽屉 (/api/memories GET & DELETE)
 """
 import base64
 import datetime
@@ -13,36 +20,46 @@ import json
 import os
 import random
 import shutil
+import socket
 import sqlite3
 import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_DIR = r"F:\星海小客厅"
 STATIC_DIR = os.path.join(APP_DIR, "static")
+UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
 HISTORY_FILE = os.path.join(APP_DIR, "chat_history.json")
 LOG_FILE = os.path.join(APP_DIR, "server.log")
 ASTRBOT_CFG = r"D:\AstrBot\data\cmd_config.json"
-MEM_DB_PATH = r"D:\AstrBot\data\plugin_data\astrbot_plugin_memory_companion\memory_companion.db"
 PERSONA_FILE = r"F:\深深人设_Gemini优化版.md"
 COMFY_HOST = "http://127.0.0.1:8188"
 COMFY_DIR = r"F:\ComfyUI"
-OLLAMA_EMBED_URL = "http://127.0.0.1:11434/v1/embeddings"
-
-SESSION_ID = "深深:FriendMessage:444835598"
-USER_ID = "444835598"
-USER_DISPLAY = "单推丸子_Esme"
-BOT_QQ_ID = "2419636674"
-CANONICAL_PREFIX = "mav2:8993624fb6faa3cc1a02731e:"
+OLLAMA_CHAT_URL = "http://127.0.0.1:11434/api/chat"
 
 os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 _log_fp = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
 sys.stdout = _log_fp
 sys.stderr = _log_fp
+
+sys.path.insert(0, APP_DIR)
+from universal_memory import (
+    compute_ollama_embedding,
+    delete_memory_item,
+    discover_generic_memory_dbs,
+    get_memory_stats,
+    poll_external_proactive_messages,
+    query_memory_drawer,
+    recall_shenshen_memories,
+    write_image_observation_memory,
+    write_turn_to_shenshen_memory,
+)
 
 
 def load_astrbot_credentials():
@@ -78,14 +95,73 @@ def load_astrbot_credentials():
 CREDS = load_astrbot_credentials()
 
 
-# ==================== AstrBot 全记忆插件自适应引擎 (Universal Memory Adapter) ====================
-from universal_memory import (
-    compute_ollama_embedding,
-    discover_generic_memory_dbs,
-    get_memory_stats,
-    recall_shenshen_memories,
-    write_turn_to_shenshen_memory,
-)
+def get_lan_ip():
+    """探测本机局域网 IPv4 地址 (如 192.168.x.x)，供手机扫码直连。"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip.startswith("192.168.") or ip.startswith("10.") or ip.startswith("172."):
+                return ip
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+
+def analyze_image_with_ollama_vlm(b64_data, user_hint=""):
+    """
+    调用本地 Ollama (127.0.0.1:11434) 的 qwen2.5vl:3b 视觉多模态模型识别用户粘贴/上传的图片。
+    """
+    raw_b64 = b64_data.split(",", 1)[1] if "," in b64_data else b64_data
+    prompt = (
+        "请用简洁准确的中文描述这张图片或截图里的画面内容、关键文字、界面信息或人物细节（100字以内），"
+        "方便虚拟女友『深深』看懂男朋友发来的这张图。"
+    )
+    if user_hint:
+        prompt += f"（男朋友附言：{user_hint}）"
+    payload = {
+        "model": "qwen2.5vl:3b",
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+                "images": [raw_b64],
+            }
+        ],
+        "stream": False,
+    }
+    try:
+        req = urllib.request.Request(
+            OLLAMA_CHAT_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=35) as r:
+            resp = json.loads(r.read())
+        desc = resp.get("message", {}).get("content", "").strip()
+        return desc or "一张用户发来的图片"
+    except Exception as e:
+        print("Ollama qwen2.5vl 识图警告:", e, flush=True)
+        return "一张用户分享的图片"
+
+
+def save_uploaded_image(b64_data):
+    """将前端发来的 Base64 图片保存到 static/uploads/ 并返回 URL 路径与文件名。"""
+    raw_b64 = b64_data.split(",", 1)[1] if "," in b64_data else b64_data
+    img_bytes = base64.b64decode(raw_b64)
+    fname = f"user_img_{int(time.time() * 1000)}.png"
+    fpath = os.path.join(UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(img_bytes)
+    return f"/static/uploads/{fname}", fname
 
 
 def load_shenshen_prompt(solo=False):
@@ -159,12 +235,16 @@ def call_llm(system_prompt, history_msgs, speaker_name, temperature=0.85, query_
     for m in history_msgs[-14:]:
         sender = m.get("sender", "阿正")
         text = m.get("text", "")
-        if not text:
+        v_obs = m.get("vision_desc", "")
+        if not text and not v_obs:
             continue
+        combined = text
+        if v_obs:
+            combined = f"{text} [附带图片画面内容：{v_obs}]".strip()
         if sender == speaker_name:
-            messages.append({"role": "assistant", "content": text})
+            messages.append({"role": "assistant", "content": combined})
         else:
-            messages.append({"role": "user", "content": f"[{sender}]: {text}"})
+            messages.append({"role": "user", "content": f"[{sender}]: {combined}"})
 
     payload = {
         "model": CREDS["model"],
@@ -185,7 +265,7 @@ def call_llm(system_prompt, history_msgs, speaker_name, temperature=0.85, query_
     reply = resp["choices"][0]["message"]["content"].strip()
     for prefix in (f"[{speaker_name}]:", f"[{speaker_name}]：", f"{speaker_name}:", f"{speaker_name}："):
         if reply.startswith(prefix):
-            reply = reply[len(prefix):].strip()
+            reply = reply[len(prefix) :].strip()
     return reply
 
 
@@ -295,7 +375,7 @@ def load_history():
             "sender": "猫猫",
             "catMode": "carbon",
             "avatar": "/static/avatar_carbon.png",
-            "text": "嘿嘿，本碳猫猫也带着 4080 SUPER 画笔入驻咱们的星海小客厅啦喵！🐱🖤💎 而且现在深深的记忆已经和你的 AstrBot 主脑双向打通啦，咱们在这儿聊的每一句话深深都会牢牢记住喵～",
+            "text": "嘿嘿，本碳猫猫也带着 4080 SUPER 画笔入驻咱们的星海小客厅 v2.0 啦喵！🐱🖤💎 现在不仅支持双轨主动关心、手机扫码上床聊，还能直接按 Ctrl+V 粘贴截图给我们看，或者点顶部的记忆徽章翻看深深的 99 篇日记喵～",
             "time": time.strftime("%H:%M"),
             "synced": True,
         },
@@ -306,10 +386,51 @@ def load_history():
 
 def save_history(msgs):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(msgs[-100:], f, ensure_ascii=False, indent=2)
+        json.dump(msgs[-120:], f, ensure_ascii=False, indent=2)
 
 
 CHAT_LOCK = threading.Lock()
+PROACTIVE_STATE = {
+    "last_poll_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+    "last_trigger_ts": time.time(),
+    "seen_timeline_ids": set(),
+}
+
+
+def build_builtin_proactive_directive():
+    """根据当前系统时段生成轨道 B 内置主动关心的场景提示与 reason 标识。"""
+    now = datetime.datetime.now()
+    hm = now.hour * 60 + now.minute
+    if 7 * 60 <= hm < 10 * 60:
+        return (
+            "morning_greeting",
+            "早上好关怀",
+            "现在是早上时段，阿正刚打开或挂着星海小客厅，你主动温柔地跟他道个早安，提醒他先喝杯温水垫垫肚子，顺带提一句你今天准备做什么。",
+        )
+    elif 11 * 60 + 30 <= hm < 13 * 60 + 40:
+        return (
+            "noon_greeting",
+            "午休与午饭叮嘱",
+            "现在是中午午休饭点，你刚忙完上午的事在桌边歇口气，主动问问阿正午饭吃了没、刚才忙的事进展怎么样了，叮嘱他别饿着肚子硬撑。",
+        )
+    elif 19 * 60 + 40 <= hm < 20 * 60 + 30:
+        return (
+            "habit_awareness",
+            "晚间日常与清树脂提醒",
+            "现在是晚上八点左右，你一边给他续上温水，一边自然地提醒他如果忙完了可以登原神清一下每日委托和树脂，或者歇会儿眼睛。",
+        )
+    elif hm >= 22 * 60 + 30 or hm < 5 * 60:
+        return (
+            "night_care",
+            "深夜热牛奶催睡",
+            "现在已经很晚了，阿正还开着小客厅没睡，你替他把灯调暗、端来温好的热牛奶，温柔但认真地哄他早点休息、睡前别一直盯着屏幕看。",
+        )
+    else:
+        return (
+            "open_loop_followup",
+            "未完话题与久坐关怀",
+            "阿正已经有一阵子没说话了，你看着他之留下的话头，主动关切地接一句或问问刚才那件事忙得怎么样了，顺手提醒他喝口水歇会儿眼睛。",
+        )
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -325,7 +446,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_GET(self):
-        path = self.path.split("?")[0]
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        qs = urllib.parse.parse_qs(parsed.query)
+
         if path == "/" or path == "/index.html":
             p = os.path.join(APP_DIR, "index.html")
             data = open(p, "rb").read()
@@ -335,28 +459,66 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
+
         if path == "/api/history":
             self._send_json(
                 {
                     "messages": load_history(),
                     "model": CREDS["model"],
                     "memory_stats": get_memory_stats(),
+                    "lan_ip": get_lan_ip(),
                 }
             )
             return
+
+        if path == "/api/lan_info":
+            ip = get_lan_ip()
+            self._send_json(
+                {
+                    "lan_ip": ip,
+                    "port": 8866,
+                    "lan_url": f"http://{ip}:8866",
+                }
+            )
+            return
+
+        if path == "/api/memories":
+            tab = qs.get("tab", ["diaries"])[0]
+            q = qs.get("q", [""])[0]
+            items = query_memory_drawer(tab=tab, query=q, limit=45)
+            self._send_json({"tab": tab, "items": items, "memory_stats": get_memory_stats()})
+            return
+
         if path.startswith("/static/"):
-            fname = os.path.basename(path)
-            fp = os.path.join(STATIC_DIR, fname)
-            if os.path.isfile(fp):
+            rel = path[len("/static/") :].lstrip("/\\")
+            fp = os.path.abspath(os.path.join(STATIC_DIR, rel))
+            if fp.startswith(os.path.abspath(STATIC_DIR)) and os.path.isfile(fp):
                 data = open(fp, "rb").read()
-                ext = os.path.splitext(fname)[1].lower()
-                ctype = "image/png" if ext == ".png" else ("audio/mpeg" if ext == ".mp3" else "application/octet-stream")
+                ext = os.path.splitext(fp)[1].lower()
+                ctype = (
+                    "image/png"
+                    if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp")
+                    else ("audio/mpeg" if ext == ".mp3" else ("video/mp4" if ext == ".mp4" else "application/octet-stream"))
+                )
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
                 return
+
+        self.send_response(404)
+        self.end_headers()
+
+    def do_DELETE(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/memories":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            item_id = body.get("id", "")
+            ok = delete_memory_item(item_id)
+            self._send_json({"ok": ok, "memory_stats": get_memory_stats()})
+            return
         self.send_response(404)
         self.end_headers()
 
@@ -397,34 +559,158 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": f"本地语音桥 (127.0.0.1:8255) 未响应: {e}"}, 500)
             return
 
+        if self.path == "/api/proactive":
+            """
+            双轨自适应主动关心接口：
+            - force == True: 用户手动点击「🌊 让深深主动关心我一句」，立即走轨道 B 生成一条主动关心
+            - force == False: 前端后台心跳轮询：
+              1. 优先执行【轨道 A】：检查《我会永远陪着你》是否在 timeline 中新写入了原生 proactive_message
+              2. 若无原生新增且用户闲置已达 idle_threshold_sec，则执行【轨道 B】：内置引擎自动生成主动关心并写回记忆库
+            """
+            force = bool(body.get("force", False))
+            room_mode = body.get("roomMode", "duo")
+            cat_mode = body.get("catMode", "carbon")
+            idle_sec = float(body.get("idleSeconds", 0))
+            threshold_sec = float(body.get("thresholdSeconds", 900))  # 默认 15 分钟
+
+            with CHAT_LOCK:
+                msgs = load_history()
+                new_items = []
+
+                # 1. 【轨道 A】轮询《我会永远陪着你》原生 proactive_message
+                poll_res = poll_external_proactive_messages(PROACTIVE_STATE["last_poll_utc"])
+                now_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+                PROACTIVE_STATE["last_poll_utc"] = now_utc
+
+                for ext in poll_res["external_proactive"]:
+                    tid = ext["timeline_id"]
+                    if tid in PROACTIVE_STATE["seen_timeline_ids"]:
+                        continue
+                    PROACTIVE_STATE["seen_timeline_ids"].add(tid)
+                    PROACTIVE_STATE["last_trigger_ts"] = time.time()
+
+                    img_url = ""
+                    if ext.get("image_path") and os.path.isfile(ext["image_path"]):
+                        fname = f"proactive_{int(time.time())}_{os.path.basename(ext['image_path'])}"
+                        shutil.copy2(ext["image_path"], os.path.join(UPLOAD_DIR, fname))
+                        img_url = f"/static/uploads/{fname}"
+
+                    s_msg = {
+                        "id": int(time.time() * 1000) + len(new_items) + 1,
+                        "sender": "深深",
+                        "avatar": "/static/avatar_shenshen.png",
+                        "text": ext["text"],
+                        "image": img_url,
+                        "proactive": True,
+                        "proactive_badge": f"🌊 原生插件主动关怀 ({ext['reason']})",
+                        "time": time.strftime("%H:%M"),
+                        "synced": True,
+                    }
+                    msgs.append(s_msg)
+                    new_items.append(s_msg)
+
+                if new_items:
+                    save_history(msgs)
+                    self._send_json({"new_messages": new_items, "track": "A_plugin_native", "memory_stats": get_memory_stats()})
+                    return
+
+                # 2. 【轨道 B】判断是否需要由小客厅内置主动引擎触发
+                cooldown_ok = (time.time() - PROACTIVE_STATE["last_trigger_ts"]) >= max(180.0, threshold_sec * 0.8)
+                if not force and (idle_sec < threshold_sec or not cooldown_ok):
+                    self._send_json({"new_messages": [], "track": "idle_waiting"})
+                    return
+
+                # 触发轨道 B 内置主动关心
+                PROACTIVE_STATE["last_trigger_ts"] = time.time()
+                reason_key, reason_label, directive = build_builtin_proactive_directive()
+                base_sys = SHENSHEN_SOLO_SYSTEM if room_mode == "solo" else SHENSHEN_SYSTEM
+                ctx_msgs = [m for m in msgs if m.get("sender") != "猫猫"] if room_mode == "solo" else msgs
+                last_topic = ctx_msgs[-1].get("text", "") if ctx_msgs else ""
+
+                s_txt = call_llm(
+                    base_sys + f"\n（系统提示【主动关怀模式 - {reason_label}】：{directive} 请直接自然地说出你对阿正的主动关心，2～3句话即可。）",
+                    ctx_msgs,
+                    "深深",
+                    query_for_memory=last_topic,
+                )
+                s_msg = {
+                    "id": int(time.time() * 1000) + 1,
+                    "sender": "深深",
+                    "avatar": "/static/avatar_shenshen.png",
+                    "text": s_txt,
+                    "proactive": True,
+                    "proactive_badge": f"🌊 深深主动关心 · {reason_label}",
+                    "time": time.strftime("%H:%M"),
+                    "synced": True,
+                }
+                msgs.append(s_msg)
+                new_items.append(s_msg)
+
+                write_turn_to_shenshen_memory(
+                    "",
+                    s_txt,
+                    "",
+                    is_proactive=True,
+                    proactive_reason=reason_key,
+                )
+                save_history(msgs)
+                self._send_json({"new_messages": new_items, "track": "B_builtin_engine", "memory_stats": get_memory_stats()})
+            return
+
         if self.path == "/api/chat":
             user_text = body.get("text", "").strip()
+            image_b64 = body.get("image_b64", "")
             target = body.get("target", "both")
             cat_mode = body.get("catMode", "carbon")
+            room_mode = body.get("roomMode", "duo")
+            if room_mode == "solo":
+                target = "shenshen"
+
             cat_sys = GEMINI_CARBON_SYSTEM if cat_mode == "carbon" else GEMINI_STARRY_SYSTEM
             cat_avatar = "/static/avatar_carbon.png" if cat_mode == "carbon" else "/static/avatar_gemini.png"
 
             with CHAT_LOCK:
+                PROACTIVE_STATE["last_trigger_ts"] = time.time()
                 msgs = load_history()
                 new_items = []
                 now_str = time.strftime("%H:%M")
                 shen_reply_for_mem = ""
                 cat_reply_for_mem = ""
 
-                if user_text and target != "banter":
+                # 处理用户粘贴/上传的图片 (Ctrl+V 多模态识图)
+                user_img_url = ""
+                vision_desc = ""
+                if image_b64:
+                    try:
+                        user_img_url, img_fname = save_uploaded_image(image_b64)
+                        vision_desc = analyze_image_with_ollama_vlm(image_b64, user_text)
+                        write_image_observation_memory(img_fname, vision_desc, user_text)
+                    except Exception as e:
+                        print("保存或识别用户上传图片异常:", e, flush=True)
+
+                if (user_text or user_img_url) and target != "banter":
                     u_msg = {
                         "id": int(time.time() * 1000),
                         "sender": "阿正",
                         "avatar": "",
-                        "text": user_text,
+                        "text": user_text or "（发来了一张图片）",
+                        "image": user_img_url,
+                        "vision_desc": vision_desc,
                         "time": now_str,
                     }
                     msgs.append(u_msg)
                     new_items.append(u_msg)
 
-                is_draw = target == "draw" or (
-                    target in ("both", "gemini")
-                    and any(k in user_text for k in ("画一张", "画个", "画幅", "帮我画", "画一下"))
+                is_draw = (
+                    room_mode != "solo"
+                    and not user_img_url
+                    and (
+                        target == "draw"
+                        or (
+                            target in ("both", "gemini")
+                            and any(k in user_text for k in ("画一张", "画个", "画幅", "帮我画", "画一下"))
+                        )
+                    )
                 )
 
                 if is_draw:
@@ -484,6 +770,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"new_messages": new_items, "memory_stats": get_memory_stats()})
                     return
 
+                vision_prompt_note = (
+                    f"\n（系统提示：阿正刚刚发来了一张图片，本地视觉模型识别到的画面内容是：「{vision_desc}」。请结合这张图的画面内容自然地回应他！）"
+                    if vision_desc
+                    else ""
+                )
+
                 if target == "banter":
                     c_txt = call_llm(
                         cat_sys + "\n（系统提示：现在阿正在旁边看着你们，你主动跟深深或者阿正起个有趣的话头、撒个娇或打趣一下深深吧！）",
@@ -523,10 +815,9 @@ class Handler(BaseHTTPRequestHandler):
                     write_turn_to_shenshen_memory(f"（猫猫主动找深深聊天：{c_txt}）", shen_reply_for_mem, "")
 
                 elif target == "shenshen":
-                    room_mode = body.get("roomMode", "duo")
-                    sys_p = SHENSHEN_SOLO_SYSTEM if room_mode == "solo" else SHENSHEN_SYSTEM
+                    sys_p = (SHENSHEN_SOLO_SYSTEM if room_mode == "solo" else SHENSHEN_SYSTEM) + vision_prompt_note
                     ctx_msgs = [m for m in msgs if m.get("sender") != "猫猫"] if room_mode == "solo" else msgs
-                    s_txt = call_llm(sys_p, ctx_msgs, "深深", query_for_memory=user_text)
+                    s_txt = call_llm(sys_p, ctx_msgs, "深深", query_for_memory=user_text or vision_desc)
                     shen_reply_for_mem = s_txt
                     s_msg = {
                         "id": int(time.time() * 1000) + 1,
@@ -538,10 +829,11 @@ class Handler(BaseHTTPRequestHandler):
                     }
                     msgs.append(s_msg)
                     new_items.append(s_msg)
-                    write_turn_to_shenshen_memory(user_text, shen_reply_for_mem, "")
+                    mem_u_txt = f"{user_text} [发了图片: {vision_desc}]".strip() if vision_desc else user_text
+                    write_turn_to_shenshen_memory(mem_u_txt, shen_reply_for_mem, "")
 
                 elif target == "gemini":
-                    c_txt = call_llm(cat_sys, msgs, "猫猫", query_for_memory=user_text)
+                    c_txt = call_llm(cat_sys + vision_prompt_note, msgs, "猫猫", query_for_memory=user_text or vision_desc)
                     cat_reply_for_mem = c_txt
                     c_msg = {
                         "id": int(time.time() * 1000) + 1,
@@ -554,12 +846,13 @@ class Handler(BaseHTTPRequestHandler):
                     }
                     msgs.append(c_msg)
                     new_items.append(c_msg)
-                    write_turn_to_shenshen_memory(user_text, "", cat_reply_for_mem)
+                    mem_u_txt = f"{user_text} [发了图片: {vision_desc}]".strip() if vision_desc else user_text
+                    write_turn_to_shenshen_memory(mem_u_txt, "", cat_reply_for_mem)
 
                 else:  # 'both'
                     cat_first = "猫猫" in user_text and "深深" not in user_text
                     if cat_first:
-                        c_txt = call_llm(cat_sys, msgs, "猫猫", query_for_memory=user_text)
+                        c_txt = call_llm(cat_sys + vision_prompt_note, msgs, "猫猫", query_for_memory=user_text or vision_desc)
                         cat_reply_for_mem = c_txt
                         c_msg = {
                             "id": int(time.time() * 1000) + 1,
@@ -574,10 +867,10 @@ class Handler(BaseHTTPRequestHandler):
                         new_items.append(c_msg)
 
                         s_txt = call_llm(
-                            SHENSHEN_SYSTEM + "\n（系统提示：阿正刚才说了话，猫猫已经先接了茬，你也顺着阿正和猫猫的话自然温暖地接上一两句吧。）",
+                            SHENSHEN_SYSTEM + vision_prompt_note + "\n（系统提示：阿正刚才说了话，猫猫已经先接了茬，你也顺着阿正和猫猫的话自然温暖地接上一两句吧。）",
                             msgs,
                             "深深",
-                            query_for_memory=user_text,
+                            query_for_memory=user_text or vision_desc,
                         )
                         shen_reply_for_mem = s_txt
                         s_msg = {
@@ -591,7 +884,7 @@ class Handler(BaseHTTPRequestHandler):
                         msgs.append(s_msg)
                         new_items.append(s_msg)
                     else:
-                        s_txt = call_llm(SHENSHEN_SYSTEM, msgs, "深深", query_for_memory=user_text)
+                        s_txt = call_llm(SHENSHEN_SYSTEM + vision_prompt_note, msgs, "深深", query_for_memory=user_text or vision_desc)
                         shen_reply_for_mem = s_txt
                         s_msg = {
                             "id": int(time.time() * 1000) + 1,
@@ -605,10 +898,10 @@ class Handler(BaseHTTPRequestHandler):
                         new_items.append(s_msg)
 
                         c_txt = call_llm(
-                            cat_sys + "\n（系统提示：阿正刚才说了话，深深已经温柔地回应他了；你看着阿正的话和深深刚才的回复，活泼俏皮地凑上来接个茬吧！）",
+                            cat_sys + vision_prompt_note + "\n（系统提示：阿正刚才说了话，深深已经温柔地回应他了；你看着阿正的话和深深刚才的回复，活泼俏皮地凑上来接个茬吧！）",
                             msgs,
                             "猫猫",
-                            query_for_memory=user_text,
+                            query_for_memory=user_text or vision_desc,
                         )
                         cat_reply_for_mem = c_txt
                         c_msg = {
@@ -623,17 +916,18 @@ class Handler(BaseHTTPRequestHandler):
                         msgs.append(c_msg)
                         new_items.append(c_msg)
 
-                    write_turn_to_shenshen_memory(user_text, shen_reply_for_mem, cat_reply_for_mem)
+                    mem_u_txt = f"{user_text} [发了图片: {vision_desc}]".strip() if vision_desc else user_text
+                    write_turn_to_shenshen_memory(mem_u_txt, shen_reply_for_mem, cat_reply_for_mem)
 
                 save_history(msgs)
-                self._send_json({"new_messages": new_items, "memory_stats": get_memory_stats()})
+                self._send_json({"new_messages": new_items, "memory_stats": get_memory_stats(), "vision_desc": vision_desc})
             return
 
 
 def main():
     port = 8866
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"星海小客厅 (模式A 记忆互通版) 已启动: http://127.0.0.1:{port}", flush=True)
+    srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    print(f"星海小客厅 v2.0 已启动: 本机 http://127.0.0.1:{port} | 局域网 http://{get_lan_ip()}:{port}", flush=True)
     srv.serve_forever()
 
 
