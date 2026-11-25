@@ -65,7 +65,7 @@ flowchart TD
 
 | 通信链路 | 传输协议与端点 | 协议细节与数据格式说明 |
 | :--- | :--- | :--- |
-| **1. 原 QQ 会话协议兼容层 (AstrBot 记忆桥接)** | **SQLite3 本地文件协议 + `aiocqhttp` 会话规范** | 直接读写 `D:\AstrBot\data\plugin_data\astrbot_plugin_memory_companion\memory_companion.db`。严格复用原 OneBot (`aiocqhttp`) 协议下的会话主键 `session_id = "深深:FriendMessage:<QQ号>"` 及 canonical 指纹前缀 `mav2:8993624fb6faa3cc1a02731e:`。写入 `timeline` 表时构造与 OneBot 私聊事件一致的 `platform: "aiocqhttp"`、`user_message` / `bot_response` 元数据，使 AstrBot 主进程将网页聊天视作合法的原生私聊历史。 |
+| **1. 全记忆插件自适应引擎 (`universal_memory.py`)** | **多驱动 SQLite3 自动嗅探 + `aiocqhttp` 会话规范** | **不再局限于单一记忆插件**！启动时自动扫描 `D:\AstrBot\data\` 并联合挂载所有已安装的记忆插件与核心库：<br>• **[Adapter 1] 《我永远陪伴你 (`astrbot_plugin_memory_companion`)》**：读写 `memory_companion.db`（47 列 `memories` + `timeline` + `memory_fts` + `memory_embeddings`）<br>• **[Adapter 2] 《QQMind 日记与人设库 (`astrbot_plugin_qqmind`)》**：自动读写 `qqmind_diaries/<QQ号>.db`（`entries` 日记表 + `fts` 二元分词 `grams` 索引）<br>• **[Adapter 3] 《通用第三方 SQLite 记忆插件嗅探器》**：通过 `PRAGMA table_info` 自动反射识别 `plugin_data/**/*.db` 下任意含 `content/memory/summary/text/message` 列的记忆插件表并双向同步<br>• **[Adapter 4] 《AstrBot 官方原生核心库 (`data_v4.db`)》**：兜底直连 `conversations` 原生多轮会话 JSON 与 `personas` 原生人设表 |
 | **2. 向量检索与无锁落库协议** | **OpenAI Embeddings 兼容协议 (`HTTP/1.1 POST`)** | 端点：`http://127.0.0.1:11434/v1/embeddings`（本地 Ollama `nomic-embed-text:latest`）。在开启 SQLite 写事务**之前**先行请求生成 768 维语义向量，并以 `Float32 Little-Endian (<768f)` 二进制 Blob 加上 SHA-1 内容指纹写入 `memory_embeddings` 与 `memory_fts`（FTS5 全文索引），彻底避免长耗时网络 I/O 阻塞 AstrBot 并发写锁。 |
 | **3. 前后端业务网关协议** | **HTTP/1.1 JSON RESTful API** | 监听 `http://127.0.0.1:8866`，零外部框架依赖（基于 Python 标准库 `ThreadingHTTPServer`）：<br>• `GET /api/history`：拉取会话历史与记忆库实时统计（有效记忆条数、时间线总帧数、最新摘要）<br>• `POST /api/chat`：提交多角色路由指令（`target`: `both` / `shenshen` / `gemini` / `banter` / `draw`）<br>• `POST /api/tts`：请求深深原声语音合成并返回 Base64 编码的 MP3 数据流<br>• `POST /api/clear`：重置本地页面上下文缓存（不破坏 SQLite 长期记忆库） |
 | **4. 大语言模型推理协议** | **OpenAI Chat Completions 协议 (`HTTPS POST`)** | 端点：`https://api.deepseek.com/v1/chat/completions`（自动从 `D:\AstrBot\data\cmd_config.json` 读取 API Key 与 `deepseek-flash` 模型配置）。每次推理前动态注入 SQLite 召回的最近 5 条长期对话摘要、关键词命中记忆及最新 10 条跨端 `timeline` 实时对话。 |
@@ -132,11 +132,12 @@ flowchart TD
 
 ```text
 星海小客厅/
-├── server_shenshen_only.py # 【纯净深深单人版后端】完全去除猫猫，仅保留深深 + AstrBot 记忆库双向同步 + 8255 原声 TTS (端口 8867)
+├── universal_memory.py     # 【全记忆插件自适应引擎】自动发现并双向读写 memory_companion / qqmind / 任意第三方 SQLite 记忆插件 / AstrBot 原生 data_v4.db
+├── server_shenshen_only.py # 【纯净深深单人版后端】完全去除猫猫，仅保留深深 + 全记忆插件自适应同步 + 8255 原声 TTS (端口 8867)
 ├── index_shenshen_only.html# 【纯净深深单人版前端】深海主题二人世界专属聊天界面
 ├── launch_shenshen_only.py # 【纯净深深单人版启动器】防重入端口探测与无窗守护启动
 ├── 启动深深单人版.bat        # 【纯净深深单人版一键启动脚本】
-├── server.py               # 【双角色同框版后端】深深 × 猫猫双角色调度 + 记忆库双向桥接 + ComfyUI 绘图 + TTS (端口 8866)
+├── server.py               # 【双角色同框版后端】深深 × 猫猫双角色调度 + 全记忆插件自适应桥接 + ComfyUI 绘图 + TTS (端口 8866)
 ├── index.html              # 【双角色同框版前端】星海毛玻璃 UI + 双角色状态栏 + 实时灯箱画廊
 ├── launch.py               # 【双角色同框版启动器】
 ├── 启动星海小客厅.bat        # 【双角色同框版一键启动脚本】

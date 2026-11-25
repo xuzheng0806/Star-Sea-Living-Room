@@ -195,7 +195,8 @@
       if (!stats || !stats.connected) return;
       const el = document.getElementById('memBadge');
       if (el) {
-        el.textContent = `🧠 已直连深深记忆库 (${stats.memories}条记忆 · ${stats.timeline}条时间线)`;
+        const label = stats.adapter_label || `${stats.memories}条记忆`;
+        el.textContent = `🧠 全记忆引擎已挂载: ${label} · ${stats.timeline}条时间线`;
       }
     }
 
