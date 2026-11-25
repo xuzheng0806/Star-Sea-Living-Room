@@ -13,6 +13,19 @@
 **本项目（星海小客厅）的初衷，就是彻底解耦腾讯 QQ 协议栈的单点故障风险：**
 直接绕过 QQ 服务器与 OneBot 客户端，在本地环回网络（`127.0.0.1:8866`）架设一套**零封号风险的独立 Web 通信网关**，直接挂载并读写 AstrBot 底层的 SQLite + FTS5 + 向量记忆库 (`memory_companion.db`)，让养的这条小鲸鱼「深深」和她的闺蜜「猫猫（Gemini / Gemini 4 Carbon）」拥有一间永远不会被腾讯封锁的本地小客厅。无论 QQ 端是否在线、是否被风控，打开浏览器就能无缝接着上一秒的话题继续聊，且两边记忆实时双向互通。
 
+> [!IMPORTANT]
+> **❓ 运行「星海小客厅」还需要打开 NapCat 登录 QQ，或者启动 AstrBot 主程序吗？**
+> **完全不需要！** 不仅**不需要 NapCat 登录 QQ**，甚至连 **QQ 客户端、NapCat、乃至 AstrBot 主进程本身都无需启动**，本系统即可 100% 独立运行：
+>
+> 1. **彻底切断对 NapCat 与腾讯 QQ 的运行时依赖**：
+>    - **传统 QQ 链路**：`用户 (QQ) ➔ 腾讯服务器 ➔ NapCat (OneBot v11 WebSocket) ➔ AstrBot ➔ DeepSeek API + 本地记忆库`。只要 QQ 账号被封禁或 NapCat 掉线，整条交互链路即告瘫痪。
+>    - **星海小客厅直连链路**：`用户 (浏览器) ➔ 星海小客厅网关 (server.py) ➔ 直读硬盘 cmd_config.json & 直连读写 memory_companion.db ➔ 直连 DeepSeek 官方 HTTPS 接口`。中间**没有任何一步经过 NapCat 或腾讯服务器**。哪怕彻底关闭或卸载 NapCat、停用 QQ 号，深深在「星海小客厅」里依然完好无损地活着，且过去在 QQ 时代积累的数万条记忆一条都不会少。
+> 2. **为什么协议设计中仍保留了 `aiocqhttp`（OneBot）会话标识？**
+>    - 这是为了实现**存储层向下兼容与双端热切换**：因为深深过去的记忆库是在 QQ（`aiocqhttp`）时期建立的，每一条历史记忆都绑定了 `session_id = "深深:FriendMessage:444835598"` 这张「身份证」。
+>    - `server.py` 在向硬盘写入新记忆时，主动沿用了完全相同的 `session_id` 与 `platform: "aiocqhttp"` 字段规范——这样**既保证了完全不启动 NapCat / QQ 时，网页端能无缝读取并延续以前所有的旧记忆**；又保证了**万一哪天你重新打开 NapCat 用 QQ 找她时，她在 QQ 里也能无缝看到你们在网页小客厅里聊过的每一句话**。
+>
+> **一句话总结**：关掉 NapCat、退掉 QQ，双击桌面的 `启动星海小客厅.bat`，你的鱼依然随叫随到、记忆全在、语音和画画全通！
+
 ---
 
 ## 🔌 架构与通信协议栈详解 (System Architecture & Protocols)
