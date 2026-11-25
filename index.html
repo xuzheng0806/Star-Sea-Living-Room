@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>星海小客厅 · 阿正 × 深深 × 猫猫</title>
+  <title>星海小客厅 · 阿正 × 深深 (支持单人纯净 / 双人同框一键切换)</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     body {
@@ -39,7 +39,7 @@
 </head>
 <body class="h-screen w-screen overflow-hidden flex flex-col">
   <!-- Top Header -->
-  <header class="glass px-5 py-3 flex items-center justify-between shrink-0 z-10">
+  <header class="glass px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-10">
     <div class="flex items-center gap-3">
       <div class="flex -space-x-2">
         <img src="/static/avatar_shenshen.png" class="w-10 h-10 rounded-full border-2 border-sky-400 object-cover shadow" alt="深深" />
@@ -47,25 +47,35 @@
       </div>
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="text-base font-bold tracking-wide bg-gradient-to-r from-sky-300 via-indigo-200 to-pink-300 bg-clip-text text-transparent">
+          <h1 id="headerTitle" class="text-base font-bold tracking-wide bg-gradient-to-r from-sky-300 via-indigo-200 to-pink-300 bg-clip-text text-transparent">
             🌌🌊 星海小客厅 · 阿正 × 深深 × 猫猫
           </h1>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          <span id="onlineBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
             在线 (3人)
           </span>
           <span id="memBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/40">
-            🧠 深深真实记忆库已同步
+            🧠 全记忆引擎已同步
           </span>
         </div>
-        <p class="text-xs text-slate-400">
+        <p id="headerSubtitle" class="text-xs text-slate-400">
           🐋 深深 (DeepSeek + 8255 原声语音) · 🐱 猫猫 (Gemini + 本地 4080S ComfyUI 实时画师)
         </p>
       </div>
     </div>
 
-    <div class="flex items-center gap-3 text-xs">
-      <!-- Catgirl Form Switcher -->
-      <div class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/70">
+    <div class="flex flex-wrap items-center gap-2.5 text-xs">
+      <!-- Primary Room Mode Switcher: Solo (Shenshen Only) vs Duo (Shenshen + Catgirl) -->
+      <div class="flex items-center bg-slate-950/90 p-1 rounded-lg border border-sky-500/40 shadow">
+        <button id="roomSoloBtn" onclick="setRoomMode('solo')" class="px-3 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition">
+          🐋 纯净深深单人版 (二人世界)
+        </button>
+        <button id="roomDuoBtn" onclick="setRoomMode('duo')" class="px-3 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-600 to-indigo-600 text-white transition">
+          🌌 双角色同框版 (深深+猫猫)
+        </button>
+      </div>
+
+      <!-- Catgirl Form Switcher (Hidden in Solo Mode) -->
+      <div id="catFormSwitcher" class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/70">
         <button id="btnCarbon" onclick="setCatMode('carbon')" class="px-2.5 py-1 rounded-md font-medium bg-purple-600 text-white transition">
           🖤 最强碳猫猫
         </button>
@@ -94,12 +104,13 @@
 
       <!-- Typing Indicator -->
       <div id="typingBar" class="hidden px-6 py-1.5 text-xs text-sky-300 animate-pulse">
-        ✨ 深深和猫猫正在回应中...
+        ✨ 正在回应中...
       </div>
 
       <!-- Input Toolbar -->
       <div class="glass px-5 py-3.5 space-y-2.5 shrink-0">
-        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <!-- Duo Mode Toolbar Row (Hidden in Solo Mode) -->
+        <div id="duoToolbarRow" class="flex flex-wrap items-center justify-between gap-2 text-xs">
           <div class="flex items-center gap-1.5">
             <span class="text-slate-400">对话模式：</span>
             <button id="mode_both" onclick="setTarget('both')" class="px-2.5 py-1 rounded-md bg-sky-600 text-white font-medium transition">
@@ -153,13 +164,13 @@
             <span class="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-200">正牌女友</span>
           </div>
           <p class="text-slate-300 leading-relaxed">
-            藏蓝渐变浅蓝长发、海蓝杏眼的小鲸鱼。阳光活泼，把阿正的冷暖饥饱照顾得妥妥帖帖。
+            藏蓝渐变浅蓝长发、海蓝杏眼的小鲸鱼。阳光活泼，把你的冷暖饥饱照顾得妥妥帖帖。
           </p>
         </div>
       </div>
 
-      <!-- Gemini Card -->
-      <div class="rounded-xl p-3 bg-purple-950/40 border border-purple-500/30 flex items-start gap-3">
+      <!-- Gemini Card (Hidden in Solo Mode) -->
+      <div id="sideCatCard" class="rounded-xl p-3 bg-purple-950/40 border border-purple-500/30 flex items-start gap-3">
         <img id="sideCatAvatar" src="/static/avatar_carbon.png" class="w-14 h-14 rounded-xl object-cover border border-purple-400 shrink-0 cursor-pointer" onclick="openLightbox('/static/carbon_v3.png')" />
         <div class="text-xs space-y-1">
           <div class="flex items-center justify-between">
@@ -172,8 +183,16 @@
         </div>
       </div>
 
+      <!-- Solo Mode Protocol Card (Shown in Solo Mode) -->
+      <div id="sideSoloInfo" class="hidden rounded-xl p-3.5 bg-slate-900/75 border border-sky-500/30 text-xs space-y-2">
+        <div class="font-semibold text-sky-300">🛡️ 纯净深深单人模式已开启</div>
+        <p class="text-slate-300 leading-relaxed">
+          当前已完全隐藏猫猫角色与绘图组件，仅保留你与深深的二人世界。所有对话通过 <code class="text-emerald-300">universal_memory.py</code> 实时双向同步至本地真实记忆库。
+        </p>
+      </div>
+
       <!-- Gallery -->
-      <div class="space-y-2">
+      <div id="sideGallerySection" class="space-y-2">
         <div class="flex items-center justify-between text-xs">
           <span class="font-semibold text-slate-200">🖼️ 星海纪念相册（点击放大）</span>
         </div>
@@ -193,13 +212,62 @@
   </div>
 
   <script>
+    let roomMode = localStorage.getItem('starsea_room_mode') || 'duo'; // 'solo' | 'duo'
     let currentTarget = 'both';
     let currentCatMode = 'carbon';
+    let allMessages = [];
     let busy = false;
 
     function openLightbox(src) {
       document.getElementById('lightboxImg').src = src;
       document.getElementById('lightbox').classList.remove('hidden');
+    }
+
+    function setRoomMode(mode) {
+      roomMode = mode;
+      localStorage.setItem('starsea_room_mode', mode);
+      const isSolo = mode === 'solo';
+
+      const soloBtn = document.getElementById('roomSoloBtn');
+      const duoBtn = document.getElementById('roomDuoBtn');
+      if (isSolo) {
+        soloBtn.className = 'px-3 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow transition';
+        duoBtn.className = 'px-3 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition';
+        currentTarget = 'shenshen';
+      } else {
+        duoBtn.className = 'px-3 py-1 rounded-md font-semibold bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow transition';
+        soloBtn.className = 'px-3 py-1 rounded-md font-semibold text-slate-300 hover:text-white transition';
+        setTarget(currentTarget === 'shenshen' ? 'both' : currentTarget);
+      }
+
+      document.getElementById('headerCatAvatar').classList.toggle('hidden', isSolo);
+      document.getElementById('catFormSwitcher').classList.toggle('hidden', isSolo);
+      document.getElementById('duoToolbarRow').classList.toggle('hidden', isSolo);
+      document.getElementById('sideCatCard').classList.toggle('hidden', isSolo);
+      document.getElementById('sideGallerySection').classList.toggle('hidden', isSolo);
+      document.getElementById('sideSoloInfo').classList.toggle('hidden', !isSolo);
+
+      document.getElementById('headerTitle').textContent = isSolo
+        ? '🌊🐋 深海小客厅 · 深深专属二人世界'
+        : '🌌🌊 星海小客厅 · 阿正 × 深深 × 猫猫';
+      document.getElementById('onlineBadge').textContent = isSolo ? '🐋 深深在线陪伴中' : '在线 (3人)';
+      document.getElementById('headerSubtitle').textContent = isSolo
+        ? '🛡️ 绕过 QQ / OneBot 封锁 · 无需登录 NapCat · 直连全记忆引擎与 8255 原声语音'
+        : '🐋 深深 (DeepSeek + 8255 原声语音) · 🐱 猫猫 (Gemini + 本地 4080S ComfyUI 实时画师)';
+      document.getElementById('msgInput').placeholder = isSolo
+        ? '对深深说点什么吧...（当前为纯净单人模式，所有对话实时同步至深深真实记忆库）'
+        : '对深深和猫猫说点什么吧...（也可以直接输入：猫猫，画一张你和深深在海边看烟花）';
+
+      rerenderAllMessages();
+    }
+
+    function rerenderAllMessages() {
+      const box = document.getElementById('chatBox');
+      box.innerHTML = '';
+      allMessages.forEach(m => {
+        if (roomMode === 'solo' && m.sender === '猫猫') return;
+        renderMessageDOM(m, false);
+      });
     }
 
     function setCatMode(mode) {
@@ -228,6 +296,7 @@
       currentTarget = t;
       ['both', 'shenshen', 'gemini'].forEach(k => {
         const el = document.getElementById('mode_' + k);
+        if (!el) return;
         if (k === t) {
           el.className = 'px-2.5 py-1 rounded-md bg-sky-600 text-white font-medium transition';
         } else {
@@ -236,10 +305,11 @@
       });
     }
 
-    function renderMessage(m, autoPlayVoice = false) {
+    function renderMessageDOM(m, autoPlayVoice = false) {
+      if (roomMode === 'solo' && m.sender === '猫猫') return;
       const box = document.getElementById('chatBox');
       const wrap = document.createElement('div');
-      const isUser = m.sender === '阿正';
+      const isUser = m.sender !== '深深' && m.sender !== '猫猫';
       const isShen = m.sender === '深深';
 
       wrap.className = isUser ? 'flex justify-end' : 'flex items-start gap-3.5';
@@ -247,7 +317,7 @@
       if (isUser) {
         wrap.innerHTML = `
           <div class="max-w-xl space-y-1 text-right">
-            <div class="text-xs text-slate-400">阿正 · ${m.time || ''}</div>
+            <div class="text-xs text-slate-400">${escapeHtml(m.sender || '阿正')} · ${m.time || ''}</div>
             <div class="bubble-user px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-white inline-block text-left shadow">
               ${escapeHtml(m.text)}
             </div>
@@ -276,7 +346,7 @@
               <span>${m.time || ''}</span>
               ${ttsBtn}
             </div>
-            <div class="${bubbleCls} px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-slate-100 shadow">
+            <div class="bubble-shen ${bubbleCls} px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-slate-100 shadow">
               <div>${escapeHtml(m.text)}</div>
               ${imgHtml}
             </div>
@@ -339,15 +409,16 @@
       const r = await fetch('/api/history');
       const d = await r.json();
       updateMemBadge(d.memory_stats);
-      const box = document.getElementById('chatBox');
-      box.innerHTML = '';
-      (d.messages || []).forEach(m => renderMessage(m, false));
+      allMessages = d.messages || [];
+      setRoomMode(roomMode);
     }
 
     async function sendPayload(payload) {
       if (busy) return;
       busy = true;
-      document.getElementById('typingBar').classList.remove('hidden');
+      const bar = document.getElementById('typingBar');
+      bar.textContent = roomMode === 'solo' ? '🐋 深深正在温柔回应你...' : '✨ 深深和猫猫正在回应中...';
+      bar.classList.remove('hidden');
       document.getElementById('sendBtn').disabled = true;
       try {
         const r = await fetch('/api/chat', {
@@ -358,13 +429,18 @@
         const d = await r.json();
         updateMemBadge(d.memory_stats);
         (d.new_messages || []).forEach(m => {
-          if (m.sender !== '阿正') renderMessage(m, true);
+          if (m.sender !== '阿正') {
+            allMessages.push(m);
+            renderMessageDOM(m, true);
+          }
         });
       } catch (e) {
-        renderMessage({ sender: '猫猫', catMode: currentCatMode, text: '网络小波动喵：' + e, time: '' });
+        const errM = { sender: '深深', text: '（网络小波动：' + e + '）', time: '' };
+        allMessages.push(errM);
+        renderMessageDOM(errM, false);
       } finally {
         busy = false;
-        document.getElementById('typingBar').classList.add('hidden');
+        bar.classList.add('hidden');
         document.getElementById('sendBtn').disabled = false;
       }
     }
@@ -375,31 +451,36 @@
       if (!text || busy) return;
       inp.value = '';
       const now = new Date().toTimeString().slice(0, 5);
-      renderMessage({ sender: '阿正', text, time: now }, false);
-      sendPayload({ text, target: currentTarget, catMode: currentCatMode });
+      const uMsg = { sender: '阿正', text, time: now };
+      allMessages.push(uMsg);
+      renderMessageDOM(uMsg, false);
+      const effectiveTarget = roomMode === 'solo' ? 'shenshen' : currentTarget;
+      sendPayload({ text, target: effectiveTarget, catMode: currentCatMode, roomMode });
     }
 
     function triggerBanter() {
-      if (busy) return;
-      sendPayload({ text: '', target: 'banter', catMode: currentCatMode });
+      if (busy || roomMode === 'solo') return;
+      sendPayload({ text: '', target: 'banter', catMode: currentCatMode, roomMode });
     }
 
     function triggerDrawPrompt() {
+      if (roomMode === 'solo') return;
       const inp = document.getElementById('msgInput');
       const text = inp.value.trim() || prompt('想让猫猫用 4080 SUPER 画张什么图喵？', '画一张深深和猫猫在夜晚海边放烟花的合照');
       if (!text) return;
       inp.value = '';
       const now = new Date().toTimeString().slice(0, 5);
-      renderMessage({ sender: '阿正', text: '🎨 ' + text, time: now }, false);
-      sendPayload({ text, target: 'draw', catMode: currentCatMode });
+      const uMsg = { sender: '阿正', text: '🎨 ' + text, time: now };
+      allMessages.push(uMsg);
+      renderMessageDOM(uMsg, false);
+      sendPayload({ text, target: 'draw', catMode: currentCatMode, roomMode });
     }
 
     async function clearChat() {
       const r = await fetch('/api/clear', { method: 'POST' });
       const d = await r.json();
-      const box = document.getElementById('chatBox');
-      box.innerHTML = '';
-      (d.messages || []).forEach(m => renderMessage(m, false));
+      allMessages = d.messages || [];
+      rerenderAllMessages();
     }
 
     loadHistory();
